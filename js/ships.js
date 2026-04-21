@@ -1,35 +1,76 @@
-// WOSB Wiki — Логика страницы кораблей
+// WOSB Wiki — Страница кораблей (Supabase + fallback на локальные данные)
 (function () {
+    let allShips = [];
     let activeType = null;
     let activeFaction = null;
     let activeRank = null;
     let searchQuery = '';
     let showDiscount = false;
-    let viewMode = 'card'; // 'card' | 'table'
+    let viewMode = 'card';
 
     const grid = document.getElementById('ships-grid');
     const countEl = document.getElementById('ship-count');
     const searchEl = document.getElementById('search-input');
     const toggleEl = document.getElementById('discount-toggle');
     const toggleLbl = document.getElementById('discount-label');
+    const loader = document.getElementById('loader');
+
+    // ===== Загрузка данных =====
+    async function loadShips() {
+        showLoader(true);
+        try {
+            const { data, error } = await db
+                .from('ships')
+                .select('*')
+                .order('type')
+                .order('rank', { ascending: false });
+
+            if (error) throw error;
+            allShips = data.map(normalizeShip);
+            console.log(`✅ Загружено ${allShips.length} кораблей из Supabase`);
+        } catch (e) {
+            console.warn('⚠️ Supabase недоступен, используем локальные данные:', e.message);
+            allShips = SHIPS; // fallback на data.js
+        }
+        showLoader(false);
+        initButtons();
+        render();
+    }
+
+    // Приводим запись из БД к единому формату с data.js
+    function normalizeShip(s) {
+        const res = {}, disc = {};
+        const fields = ['wood', 'iron', 'cloth', 'beam', 'bulkhead', 'sail', 'plate',
+            'battle_mark', 'blueprint_frag', 'blueprint', 'escudo'];
+        fields.forEach(f => {
+            if (s[f] > 0) {
+                res[f] = s[f];
+                disc[f] = Math.round(s[f] * (1 - (s.discount || 0.20)));
+            }
+        });
+        return {
+            name: s.name, rank: s.rank, type: s.type, faction: s.faction,
+            discount: s.discount, res, disc
+        };
+    }
+
+    function showLoader(on) {
+        if (loader) loader.style.display = on ? 'flex' : 'none';
+    }
 
     // ===== Фильтры =====
-    function setFilter(kind, value, btn) {
+    function setFilter(kind, value) {
         const map = {
             type: () => { activeType = activeType === value ? null : value; },
             faction: () => { activeFaction = activeFaction === value ? null : value; },
-            rank: () => { activeRank = activeRank === value ? null : value; }
+            rank: () => { activeRank = activeRank === value ? null : value; },
         };
         map[kind]();
 
         document.querySelectorAll(`.btn-${kind}`).forEach(b => b.classList.remove('active', 'active-type'));
-        if (activeType || activeFaction || activeRank) {
-            const active = document.querySelector(`[data-${kind}="${value}"]`);
-            if (active) {
-                active.classList.add('active');
-                if (kind === 'type') active.classList.add('active-type');
-            }
-        }
+        if (kind === 'type' && activeType) document.querySelector(`[data-type="${activeType}"]`)?.classList.add('active', 'active-type');
+        if (kind === 'faction' && activeFaction) document.querySelector(`[data-faction="${activeFaction}"]`)?.classList.add('active');
+        if (kind === 'rank' && activeRank) document.querySelector(`[data-rank="${activeRank}"]`)?.classList.add('active');
         render();
     }
 
@@ -41,13 +82,11 @@
         render();
     }
 
-    // ===== Поиск =====
     searchEl.addEventListener('input', function () {
         searchQuery = this.value.toLowerCase().trim();
         render();
     });
 
-    // ===== Скидка =====
     toggleEl.addEventListener('click', function () {
         showDiscount = !showDiscount;
         this.classList.toggle('on', showDiscount);
@@ -55,9 +94,9 @@
         render();
     });
 
-    // ===== Вид =====
     document.getElementById('btn-card').addEventListener('click', () => setView('card'));
     document.getElementById('btn-table').addEventListener('click', () => setView('table'));
+
     function setView(mode) {
         viewMode = mode;
         grid.classList.toggle('table-view', mode === 'table');
@@ -66,9 +105,9 @@
         render();
     }
 
-    // ===== Данные =====
+    // ===== Фильтрация =====
     function filtered() {
-        return SHIPS.filter(s => {
+        return allShips.filter(s => {
             if (activeType && s.type !== activeType) return false;
             if (activeFaction && s.faction !== activeFaction) return false;
             if (activeRank && s.rank !== activeRank) return false;
@@ -91,8 +130,7 @@
         </div>`;
             return;
         }
-
-        grid.innerHTML = ships.map(s => renderCard(s)).join('');
+        grid.innerHTML = ships.map(renderCard).join('');
     }
 
     function renderCard(s) {
@@ -105,14 +143,14 @@
             .filter(([, v]) => v > 0)
             .map(([key, val]) => {
                 const r = RES_LABELS[key] || { label: key, emoji: '📦' };
-                const original = s.res[key];
-                const hasDisc = showDiscount && s.disc && original && original !== val;
+                const orig = s.res[key];
+                const hasDisc = showDiscount && orig && orig !== val;
                 return `
           <div class="res-item" title="${r.label}">
             <span class="res-emoji">${r.emoji}</span>
             ${isTable ? '' : `<span class="res-label">${r.label}</span>`}
-            <span class="res-value">${val}</span>
-            ${hasDisc ? `<span class="res-value-disc">(-${Math.round((1 - val / original) * 100)}%)</span>` : ''}
+            <span class="res-value">${val.toLocaleString('ru-RU')}</span>
+            ${hasDisc ? `<span class="res-value-disc">(-${Math.round((1 - val / orig) * 100)}%)</span>` : ''}
           </div>`;
             }).join('');
 
@@ -140,48 +178,44 @@
       </div>`;
     }
 
-    // ===== Инициализация кнопок =====
+    // ===== Кнопки фильтров =====
     function initButtons() {
-        // Типы
-        const types = [...new Set(SHIPS.map(s => s.type))];
+        const types = [...new Set(allShips.map(s => s.type))];
+        const factions = [...new Set(allShips.map(s => s.faction).filter(Boolean))];
+
         const typeContainer = document.getElementById('type-filters');
         types.forEach(t => {
             const btn = document.createElement('button');
             btn.className = 'btn-filter btn-type';
             btn.dataset.type = t;
             btn.innerHTML = `${TYPE_ICONS[t] || ''} ${t}`;
-            btn.addEventListener('click', () => setFilter('type', t, btn));
+            btn.addEventListener('click', () => setFilter('type', t));
             typeContainer.appendChild(btn);
         });
 
-        // Фракции
-        const factions = [...new Set(SHIPS.map(s => s.faction).filter(Boolean))];
         const facContainer = document.getElementById('faction-filters');
         factions.forEach(f => {
             const btn = document.createElement('button');
             btn.className = 'btn-filter btn-faction';
             btn.dataset.faction = f;
             btn.innerHTML = `${FACTION_ICONS[f] || ''} ${f}`;
-            btn.addEventListener('click', () => setFilter('faction', f, btn));
+            btn.addEventListener('click', () => setFilter('faction', f));
             facContainer.appendChild(btn);
         });
 
-        // Ранги
-        const ranks = [1, 2, 3, 4, 5, 6, 7];
         const rankContainer = document.getElementById('rank-filters');
-        ranks.forEach(r => {
+        [1, 2, 3, 4, 5, 6, 7].forEach(r => {
             const btn = document.createElement('button');
             btn.className = 'btn-filter btn-rank';
             btn.dataset.rank = r;
             btn.innerHTML = `★${r}`;
-            btn.style.cssText = `background:linear-gradient(135deg,var(--rank-${r}),var(--rank-${r}))22;border-color:var(--rank-${r})55;`;
-            btn.addEventListener('click', () => setFilter('rank', r, btn));
+            btn.addEventListener('click', () => setFilter('rank', r));
             rankContainer.appendChild(btn);
         });
 
         document.getElementById('btn-reset').addEventListener('click', resetFilters);
     }
 
-    initButtons();
     setView('card');
+    loadShips();
 })();
