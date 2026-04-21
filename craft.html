@@ -122,6 +122,7 @@
 
         input[type="range"] {
             -webkit-appearance: none;
+            appearance: none;
             width: 100%;
             height: 4px;
             background: var(--border);
@@ -132,6 +133,7 @@
 
         input[type="range"]::-webkit-slider-thumb {
             -webkit-appearance: none;
+            appearance: none;
             width: 18px;
             height: 18px;
             border-radius: 50%;
@@ -472,7 +474,7 @@
             if (discount > 0) {
                 const saving = items.filter(i => i.hasDiscount && i.cost)
                     .reduce((s, i) => s + i.cost * (discount / 100), 0);
-                if (saving > 0) { savEl.style.display = 'block'; document.getElementById('saving-val').textContent = `−${fmt(saving)} ₽`; }
+                if (saving > 0) { savEl.style.display = 'block'; document.getElementById('saving-val').textContent = `−${fmt(saving)} 🪙`; }
                 else savEl.style.display = 'none';
             } else savEl.style.display = 'none';
 
@@ -500,10 +502,10 @@
                         const discounted = item.hasDiscount && discount > 0 ? item.cost * (1 - discount / 100) : null;
                         costHtml = `<div class="craft-cost-block">
           ${discounted !== null
-                                ? `<div class="craft-cost-base" style="text-decoration:line-through;opacity:.4;font-size:11px">${fmt(item.cost)} ₽</div>
-               <div style="color:#4ade80;font-size:13px;font-weight:800">${fmt(discounted)} ₽</div>
+                                ? `<div class="craft-cost-base" style="text-decoration:line-through;opacity:.4;font-size:11px">${fmt(item.cost)} 🪙</div>
+               <div style="color:#4ade80;font-size:13px;font-weight:800">${fmt(discounted)} 🪙</div>
                <div class="craft-cost-label">со скидкой ${discount}%</div>`
-                                : `<div class="craft-cost-base">${fmt(item.cost)} ₽</div>
+                                : `<div class="craft-cost-base">${fmt(item.cost)} 🪙</div>
                <div class="craft-cost-label">${item.hasDiscount ? '<span style="color:var(--gold-light)">✓ скидка</span>' : 'себестоимость'}</div>`}
         </div>`;
                     }
