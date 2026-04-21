@@ -7,6 +7,7 @@
     <title>Орудия — WOSB Wiki</title>
     <meta name="description" content="Справочник орудий World of Sea Battle: стоимость крафта, типы, ресурсы">
     <link rel="stylesheet" href="css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         .gun-card {
             background: var(--bg-card);
@@ -102,15 +103,34 @@
             background: var(--border);
         }
 
-        /* Только иконка — не расходуем ресурсы */
-        .pirate-only {
+        .data-source {
+            font-size: 11px;
+            padding: 3px 8px;
+            border-radius: 5px;
+            font-weight: 600;
+        }
+
+        .data-source.live {
+            background: rgba(74, 222, 128, 0.1);
+            color: #4ade80;
+            border: 1px solid rgba(74, 222, 128, 0.25);
+        }
+
+        .data-source.local {
+            background: rgba(201, 162, 39, 0.1);
             color: var(--gold);
+            border: 1px solid rgba(201, 162, 39, 0.3);
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
         }
     </style>
 </head>
 
 <body>
-
     <header>
         <div class="header-inner">
             <a href="index.html" class="logo"><span class="logo-anchor">⚓</span> WOSB Wiki</a>
@@ -129,7 +149,6 @@
             <p class="page-subtitle">Стоимость крафта и ресурсы для всех орудий</p>
         </div>
 
-        <!-- Фильтры -->
         <div class="filters" style="margin-bottom:24px;">
             <div class="filter-group">
                 <div class="filter-label">🔍 Поиск</div>
@@ -144,83 +163,135 @@
 
         <div class="stats-bar">
             <div class="stat-chip">Найдено: <span id="gun-count">0</span> орудий</div>
+            <div class="stat-chip" id="src-indicator"></div>
         </div>
 
-        <div id="guns-container"></div>
+        <div id="loader" style="text-align:center;padding:60px;color:var(--text-muted)">
+            <span style="font-size:32px;display:block;margin-bottom:12px;animation:spin 1s linear infinite">⚓</span>
+            Загружаем данные...
+        </div>
+        <div id="guns-container" style="display:none"></div>
     </main>
 
+    <script src="js/config.js"></script>
     <script src="js/guns_data.js"></script>
     <script>
-        (function () {
-            let activeType = null;
-            let searchQuery = '';
+        const GUN_TYPE_ICONS = {
+            'Пушка': '💥', 'Кульверина': '🎯', 'Карронада': '💣', 'Бомбарда': '🔥', 'Мортира': '🏹'
+        };
+        const GUN_RES_LABELS = {
+            gold: { label: 'Золото', emoji: '💰' },
+            iron: { label: 'Железо', emoji: '⚙️' },
+            copper: { label: 'Медь', emoji: '🔶' },
+            bronze: { label: 'Бронза', emoji: '🥉' },
+            rum: { label: 'Ром', emoji: '🍺' },
+            volcanic: { label: 'Вулканическая', emoji: '🌋' },
+            pirate_token: { label: 'Пиратский жетон', emoji: '🏴‍☠️' },
+        };
+        const GUN_RES_COLS = ['gold', 'iron', 'copper', 'bronze', 'rum', 'volcanic', 'pirate_token'];
 
-            const container = document.getElementById('guns-container');
-            const countEl = document.getElementById('gun-count');
-            const searchEl = document.getElementById('search-input');
+        let ALL_GUNS = [];
+        let activeType = null;
+        let searchQuery = '';
 
-            function filtered() {
-                return GUNS.filter(g => {
-                    if (activeType && g.type !== activeType) return false;
-                    if (searchQuery && !g.name.toLowerCase().includes(searchQuery)) return false;
-                    return true;
-                });
-            }
+        // Нормализация строки из БД в объект орудия
+        function dbToGun(row) {
+            const res = {};
+            GUN_RES_COLS.forEach(c => { if (row[c] > 0) res[c] = row[c]; });
+            return { name: row.name, type: row.type, qty: row.qty || 1, cost: row.craft_cost || 0, res };
+        }
 
-            function render() {
-                const guns = filtered();
-                countEl.textContent = guns.length;
+        // Загрузка из Supabase
+        async function loadGuns() {
+            const { data, error } = await db.from('guns').select('*').order('id');
+            if (error) throw error;
+            return data.map(dbToGun);
+        }
 
-                // Группируем по типам
-                const types = [...new Set(GUNS.map(g => g.type))];
-                const byType = {};
-                types.forEach(t => byType[t] = guns.filter(g => g.type === t));
+        // Преобразование локальных данных из guns_data.js
+        function localGuns() {
+            return GUNS.map(g => {
+                const res = {};
+                Object.keys(GUN_RES_LABELS).forEach(k => { if (g[k] > 0) res[k] = g[k]; });
+                return { name: g.name, type: g.type, qty: g.qty || 1, cost: g.cost || 0, res };
+            });
+        }
 
-                container.innerHTML = types.map(type => {
-                    const items = byType[type];
-                    if (!items.length) return '';
+        function filtered() {
+            return ALL_GUNS.filter(g =>
+                (!activeType || g.type === activeType) &&
+                (!searchQuery || g.name.toLowerCase().includes(searchQuery))
+            );
+        }
 
-                    const cards = items.map(g => {
-                        const res = Object.entries(g)
-                            .filter(([k]) => GUN_RES_LABELS[k] && g[k] > 0)
-                            .map(([k, v]) => {
-                                const r = GUN_RES_LABELS[k];
-                                return `<div class="res-item" title="${r.label}">
-              <span class="res-emoji">${r.emoji}</span>
-              <span class="res-value">${v.toLocaleString('ru-RU')}</span>
-            </div>`;
-                            }).join('');
+        function render() {
+            const guns = filtered();
+            document.getElementById('gun-count').textContent = guns.length;
 
-                        const costDisplay = g.cost > 0
-                            ? `<div style="color:var(--gold-light);font-size:13px;font-weight:700">${g.cost.toLocaleString('ru-RU')} ₽</div><div class="gun-cost-label">примерная себестоимость</div>`
-                            : `<div style="color:var(--text-muted);font-size:12px">— биржа</div>`;
+            const types = ['Пушка', 'Кульверина', 'Карронада', 'Бомбарда', 'Мортира'];
+            const byType = {};
+            types.forEach(t => byType[t] = guns.filter(g => g.type === t));
 
-                        return `
-          <div class="gun-card">
-            <div class="gun-icon">${GUN_TYPE_ICONS[g.type] || '💥'}</div>
-            <div class="gun-info">
-              <div class="gun-name">${g.name}${g.qty > 1 ? ` <span style="color:var(--text-muted);font-size:12px">x${g.qty}</span>` : ''}</div>
-              <div class="res-grid">${res || '<span style="color:var(--text-muted);font-size:12px">нет ресурсов</span>'}</div>
-            </div>
-            <div class="gun-cost">${costDisplay}</div>
-          </div>`;
+            document.getElementById('guns-container').innerHTML = types.map(type => {
+                const items = byType[type];
+                if (!items.length) return '';
+
+                const cards = items.map(g => {
+                    const res = Object.entries(g.res).map(([k, v]) => {
+                        const r = GUN_RES_LABELS[k];
+                        if (!r) return '';
+                        return `<div class="res-item" title="${r.label}">
+          <span class="res-emoji">${r.emoji}</span>
+          <span class="res-value">${v.toLocaleString('ru-RU')}</span>
+        </div>`;
                     }).join('');
 
-                    return `
-        <div class="type-section">
-          <div class="type-header">${GUN_TYPE_ICONS[type]} ${type}</div>
-          <div style="display:grid;gap:8px;">${cards}</div>
-        </div>`;
+                    const costHtml = g.cost > 0
+                        ? `<div style="color:var(--gold-light);font-size:13px;font-weight:700">${g.cost.toLocaleString('ru-RU')} ₽</div><div class="gun-cost-label">примерная себестоимость</div>`
+                        : `<div style="color:var(--text-muted);font-size:12px">— биржа / жетоны</div>`;
+
+                    return `<div class="gun-card">
+        <div class="gun-icon">${GUN_TYPE_ICONS[g.type] || '💥'}</div>
+        <div class="gun-info">
+          <div class="gun-name">${g.name}${g.qty > 1 ? ` <span style="color:var(--text-muted);font-size:12px">×${g.qty}</span>` : ''}</div>
+          <div class="res-grid">${res || '<span style="color:var(--text-muted);font-size:12px">нет ресурсов</span>'}</div>
+        </div>
+        <div class="gun-cost">${costHtml}</div>
+      </div>`;
                 }).join('');
+
+                return `<div class="type-section">
+      <div class="type-header">${GUN_TYPE_ICONS[type]} ${type}</div>
+      <div style="display:grid;gap:8px;">${cards}</div>
+    </div>`;
+            }).join('');
+        }
+
+        // Инициализация
+        async function init() {
+            const loader = document.getElementById('loader');
+            const cont = document.getElementById('guns-container');
+            const srcEl = document.getElementById('src-indicator');
+
+            try {
+                ALL_GUNS = await loadGuns();
+                srcEl.innerHTML = '<span class="data-source live">🟢 Supabase</span>';
+            } catch (e) {
+                console.warn('Supabase недоступен:', e);
+                ALL_GUNS = localGuns();
+                srcEl.innerHTML = '<span class="data-source local">🟡 Локальные данные</span>';
             }
 
-            // Кнопки фильтров
-            const types = [...new Set(GUNS.map(g => g.type))];
+            loader.style.display = 'none';
+            cont.style.display = 'block';
+
+            // Фильтры по типу
+            const types = ['Пушка', 'Кульверина', 'Карронада', 'Бомбарда', 'Мортира'];
             const typeContainer = document.getElementById('type-filters');
             types.forEach(t => {
                 const btn = document.createElement('button');
                 btn.className = 'btn-filter';
-                btn.innerHTML = `${GUN_TYPE_ICONS[t] || ''} ${t}`;
+                btn.innerHTML = `${GUN_TYPE_ICONS[t]} ${t}`;
                 btn.addEventListener('click', () => {
                     activeType = activeType === t ? null : t;
                     document.querySelectorAll('#type-filters .btn-filter').forEach(b => b.classList.remove('active', 'active-type'));
@@ -231,20 +302,19 @@
             });
 
             document.getElementById('btn-reset').addEventListener('click', () => {
-                activeType = null;
-                searchQuery = '';
-                searchEl.value = '';
+                activeType = null; searchQuery = '';
+                document.getElementById('search-input').value = '';
                 document.querySelectorAll('.btn-filter').forEach(b => b.classList.remove('active', 'active-type'));
                 render();
             });
-
-            searchEl.addEventListener('input', function () {
-                searchQuery = this.value.toLowerCase().trim();
-                render();
+            document.getElementById('search-input').addEventListener('input', function () {
+                searchQuery = this.value.toLowerCase().trim(); render();
             });
 
             render();
-        })();
+        }
+
+        init();
     </script>
 </body>
 

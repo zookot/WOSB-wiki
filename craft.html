@@ -7,6 +7,7 @@
     <title>Крафт — WOSB Wiki</title>
     <meta name="description" content="Рецепты крафта World of Sea Battle: мастерские, переработка, расходные предметы">
     <link rel="stylesheet" href="css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         .craft-grid {
             display: grid;
@@ -63,7 +64,6 @@
             flex-wrap: wrap;
         }
 
-        /* Стоимость */
         .craft-cost-block {
             position: absolute;
             top: 14px;
@@ -76,14 +76,6 @@
             font-weight: 700;
             color: var(--gold-light);
             line-height: 1.2;
-        }
-
-        .craft-cost-disc {
-            font-size: 12px;
-            font-weight: 700;
-            color: #4ade80;
-            line-height: 1.2;
-            display: none;
         }
 
         .craft-cost-label {
@@ -167,7 +159,6 @@
             color: #f87171;
         }
 
-        /* Пресеты */
         .discount-presets {
             display: flex;
             gap: 6px;
@@ -215,11 +206,29 @@
             height: 1px;
             background: linear-gradient(90deg, var(--gold)44, transparent);
         }
+
+        .data-source {
+            font-size: 11px;
+            padding: 3px 8px;
+            border-radius: 5px;
+            font-weight: 600;
+        }
+
+        .data-source.live {
+            background: rgba(74, 222, 128, 0.1);
+            color: #4ade80;
+            border: 1px solid rgba(74, 222, 128, 0.25);
+        }
+
+        .data-source.local {
+            background: rgba(201, 162, 39, 0.1);
+            color: var(--gold);
+            border: 1px solid rgba(201, 162, 39, 0.3);
+        }
     </style>
 </head>
 
 <body>
-
     <header>
         <div class="header-inner">
             <a href="index.html" class="logo"><span class="logo-anchor">⚓</span> WOSB Wiki</a>
@@ -266,7 +275,6 @@
             </div>
         </div>
 
-        <!-- Фильтры -->
         <div class="filters" style="margin-bottom:24px;">
             <div class="filter-group">
                 <div class="filter-label">🔍 Поиск</div>
@@ -284,70 +292,26 @@
             <div class="stat-chip" id="total-saving" style="display:none">
                 Экономия: <span id="saving-val" style="color:#4ade80;font-weight:700"></span>
             </div>
+            <div class="stat-chip" id="src-indicator"></div>
         </div>
 
-        <div id="craft-container"></div>
+        <div id="loader" style="text-align:center;padding:60px;color:var(--text-muted)">
+            <span style="font-size:32px;display:block;margin-bottom:12px;animation:spin 1s linear infinite">⚓</span>
+            Загружаем данные...
+        </div>
+        <div id="craft-container" style="display:none"></div>
     </main>
 
+    <style>
+        @keyframes spin {
+            to {
+                transform: rotate(360deg)
+            }
+        }
+    </style>
+    <script src="js/config.js"></script>
     <script>
-        // ===== Данные крафта из CSV =====
-        // cost = базовая стоимость без скидки
-        const CRAFT_DATA = [
-            // МАСТЕРСКИЕ (скидка применима)
-            { cat: 'Мастерские', name: 'Балка', icon: '🔩', cost: 340, time: 5, hasDiscount: true, res: { wood: 100, iron: 5, copper: 4 } },
-            { cat: 'Мастерские', name: 'Бронза', icon: '🥉', cost: 608, time: 6, hasDiscount: true, res: { iron: 20, copper: 10, coal: 1 } },
-            { cat: 'Мастерские', name: 'Пластина', icon: '🔘', cost: 776, time: 6, hasDiscount: true, res: { iron: 30, coal: 15, cloth: 4 } },
-            { cat: 'Мастерские', name: 'Парусина', icon: '⛵', cost: 61, time: 3, hasDiscount: true, res: { coal: 1, cloth: 10 } },
-            { cat: 'Мастерские', name: 'Переборка', icon: '🛡️', cost: 1289, time: 5, hasDiscount: true, res: { iron: 70, coal: 1 } },
-
-            // ПЕРЕРАБОТКА (скидки нет — нет стоимости крафта)
-            { cat: 'Переработка', name: 'Железо', icon: '⚙️', cost: 88, time: 1, hasDiscount: false, res: { iron_ore: 10 } },
-            { cat: 'Переработка', name: 'Медь', icon: '🔶', cost: 24, time: 2, hasDiscount: false, res: { copper_ore: 1 } },
-            { cat: 'Переработка', name: 'Уголь', icon: '⬛', cost: 8, time: 1, hasDiscount: false, res: { debris: 2 } },
-            { cat: 'Переработка', name: 'Свежее мясо', icon: '🥩', cost: 12, time: 1, hasDiscount: false, res: { animals: 1 } },
-            { cat: 'Переработка', name: '50 Ткани + 1 Кожа', icon: '🧵', cost: 120, time: 20, hasDiscount: false, res: { animals: 10 } },
-
-            // РАЗНОЕ (скидки нет для большинства)
-            { cat: 'Разное', name: 'Сундук', icon: '📦', cost: 500, time: 1, hasDiscount: false, res: { gold: 500 } },
-            { cat: 'Разное', name: 'Имперский чертеж', icon: '📋', cost: 2800000, time: 200, hasDiscount: false, res: { gold: 100000, blueprint_frag: 100 } },
-            { cat: 'Разное', name: 'Порцион', icon: '🥘', cost: 71, time: 2, hasDiscount: false, res: { rum: 1, supplies: 2, fresh_meat: 3 } },
-            { cat: 'Разное', name: 'Снасти', icon: '🔗', cost: 30.5, time: 1, hasDiscount: false, res: { wood: 5, iron: 1 } },
-            { cat: 'Разное', name: 'Чугунные ядра', icon: '⚫', cost: 144, time: 1, hasDiscount: false, res: { iron: 8 } },
-            { cat: 'Разное', name: 'Брандскугели', icon: '🔴', cost: 120, time: 1, hasDiscount: false, res: { iron: 5, battle_mark: 2 } },
-            { cat: 'Разного', name: 'Бомбы осколочные', icon: '💥', cost: 114, time: 1, hasDiscount: false, res: { iron: 5, copper: 1 } },
-            { cat: 'Разное', name: 'Малые поджигающие бочки', icon: '🛢️', cost: 400, time: 1, hasDiscount: false, res: { wood: 100, whale_oil: 10 } },
-            { cat: 'Разное', name: 'Большие осколочные мины', icon: '💣', cost: 4180, time: 1, hasDiscount: false, res: { wood: 200, animals: 20 } },
-
-            // РАСХОДНЫЕ ПРЕДМЕТЫ (скидки нет — стоимость = цена ресурсов)
-            { cat: 'Расходные предметы', name: 'Деревяные заплатки', icon: '🪵', cost: 25, hasDiscount: false, res: { wood: 10 } },
-            { cat: 'Расходные предметы', name: 'Железные заплатки', icon: '⚙️', cost: 540, hasDiscount: false, res: { iron: 30 } },
-            { cat: 'Расходные предметы', name: 'Бронзовые заплатки', icon: '🥉', cost: 473.6, hasDiscount: false, res: { bronze: 1 } },
-            { cat: 'Расходные предметы', name: 'Заплатки из обломков', icon: '🗑️', cost: 600, hasDiscount: false, res: { debris: 25, battle_mark: 1 } },
-            { cat: 'Расходные предметы', name: 'Деревянные ремонт-набор', icon: '🪵', cost: 50.6, hasDiscount: false, res: { wood: 10, cloth: 8 } },
-            { cat: 'Расходные предметы', name: 'Железные ремонт-набор', icon: '⚙️', cost: 492, hasDiscount: false, res: { iron: 22, cloth: 30 } },
-            { cat: 'Расходные предметы', name: 'Бронзовый ремонт-набор', icon: '🥉', cost: 540.3, hasDiscount: false, res: { bronze: 1, sail: 1 } },
-            { cat: 'Расходные предметы', name: 'Походный рацион', icon: '🎒', cost: 160, hasDiscount: false, res: { gold: 100, rum: 10 } },
-            { cat: 'Расходные предметы', name: 'Малые добавочные паруса', icon: '⛵', cost: 40, hasDiscount: false, res: { gold: 40 } },
-            { cat: 'Расходные предметы', name: 'Большие добавочные паруса', icon: '⛵', cost: 133.4, hasDiscount: false, res: { sail: 2 } },
-            { cat: 'Расходные предметы', name: 'Малые пластины', icon: '🔘', cost: 540, hasDiscount: false, res: { iron: 30 } },
-            { cat: 'Расходные предметы', name: 'Большие пластины', icon: '🔘', cost: 3217.2, hasDiscount: false, res: { plate: 1, battle_mark: 5 } },
-            { cat: 'Расходные предметы', name: 'Дымовая бомба', icon: '💨', cost: 5000, hasDiscount: false, res: { battle_mark: 10 } },
-            { cat: 'Расходные предметы', name: 'Дымовая завеса', icon: '💨', cost: 5720, hasDiscount: false, res: { iron: 40, battle_mark: 10 } },
-            { cat: 'Расходные предметы', name: 'Подкуп', icon: '💀', cost: 10000, hasDiscount: false, res: { voodoo_skull: 1 } },
-            { cat: 'Расходные предметы', name: 'Черные двойной порох', icon: '⬛', cost: 60, hasDiscount: false, res: { gold: 60 } },
-            { cat: 'Расходные предметы', name: 'Красный двойной порох', icon: '🔴', cost: 60, hasDiscount: false, res: { gold: 60 } },
-            { cat: 'Расходные предметы', name: 'Белый двойной порох', icon: '⬜', cost: 60, hasDiscount: false, res: { gold: 60 } },
-            { cat: 'Расходные предметы', name: 'Ром-паёк', icon: '🍺', cost: 120, hasDiscount: false, res: { rum: 20 } },
-            { cat: 'Расходные предметы', name: 'Сытный паёк', icon: '🍖', cost: 400, hasDiscount: false, res: { fish: 20, fresh_meat: 40 } },
-            { cat: 'Расходные предметы', name: 'Фосфор', icon: '🟡', cost: 2150, hasDiscount: false, res: { gold: 150, battle_mark: 4 } },
-            { cat: 'Расходные предметы', name: 'Пороховой заряд', icon: '💥', cost: 2150, hasDiscount: false, res: { gold: 150, battle_mark: 4 } },
-            { cat: 'Расходные предметы', name: 'Крюк Посейдона', icon: '🪝', cost: 15000, hasDiscount: false, res: { gold: 5000, voodoo_skull: 1 } },
-            { cat: 'Расходные предметы', name: 'Сигнальная ракета Синяя', icon: '🔵', cost: 130, hasDiscount: false, res: { gold: 130 } },
-            { cat: 'Расходные предметы', name: 'Сигнальная ракета Красная', icon: '🔴', cost: 200, hasDiscount: false, res: { gold: 200 } },
-            { cat: 'Расходные предметы', name: 'Сигнальная ракета Желтая', icon: '🟡', cost: 5000, hasDiscount: false, res: { battle_mark: 10 } },
-            { cat: 'Расходные предметы', name: 'Горн', icon: '📯', cost: 10000, hasDiscount: false, res: { voodoo_skull: 1 } },
-        ];
-
+        // ===== Ресурсные метки =====
         const RES_LABELS_CRAFT = {
             wood: { label: 'Дерево', emoji: '🪵' },
             iron: { label: 'Железо', emoji: '⚙️' },
@@ -369,154 +333,215 @@
             whale_oil: { label: 'Китовый жир', emoji: '🐋' },
             voodoo_skull: { label: 'Череп Вуду', emoji: '💀' },
             bronze: { label: 'Бронза', emoji: '🥉' },
-            plate: { label: 'Пластина', emoji: '🔘' },
+            plate_res: { label: 'Пластина', emoji: '🔘' },
+            tar: { label: 'Смола', emoji: '🫙' },
         };
 
         const CAT_ICONS = {
-            'Мастерские': '🏭',
-            'Переработка': '♻️',
-            'Расходные предметы': '🎒',
-            'Разное': '📦',
+            'Мастерские': '🏭', 'Переработка': '♻️',
+            'Расходные предметы': '🎒', 'Разное': '📦'
         };
-
         const CATS_ORDER = ['Мастерские', 'Переработка', 'Расходные предметы', 'Разное'];
 
-        (function () {
-            let activeCategory = null;
-            let searchQuery = '';
-            let discount = 0; // 0–35
+        // Иконки по имени
+        const ITEM_ICONS = {
+            'Балка': '🔩', 'Бронза': '🥉', 'Пластина': '🔘', 'Парусина': '⛵', 'Переборка': '🛡️',
+            'Железо': '⚙️', 'Медь': '🔶', 'Уголь': '⬛', 'Свежее мясо': '🥩', '50 Ткани + 1 Кожа': '🧵',
+            'Сундук': '📦', 'Имперский чертеж': '📋', 'Порцион': '🥘', 'Снасти': '🔗',
+            'Чугунные ядра': '⚫', 'Брандскугели': '🔴', 'Бомбы осколочные': '💥',
+            'Малые поджигающие бочки': '🛢️', 'Большие осколочные мины': '💣',
+            'Деревяные заплатки': '🪵', 'Железные заплатки': '⚙️', 'Бронзовые заплатки': '🥉',
+            'Заплатки из обломков': '🗑️', 'Деревянные ремонт-набор': '🪵', 'Железные ремонт-набор': '⚙️',
+            'Бронзовый ремонт-набор': '🥉', 'Походный рацион': '🎒', 'Малые добавочные паруса': '⛵',
+            'Большие добавочные паруса': '⛵', 'Малые пластины': '🔘', 'Большие пластины': '🔘',
+            'Дымовая бомба': '💨', 'Дымовая завеса': '💨', 'Подкуп': '💀',
+            'Черные двойной порох': '⬛', 'Красный двойной порох': '🔴', 'Белый двойной порох': '⬜',
+            'Ром-паёк': '🍺', 'Сытный паёк': '🍖', 'Фосфор': '🟡', 'Пороховой заряд': '💥',
+            'Крюк Посейдона': '🪝', 'Сигнальная ракета Синяя': '🔵',
+            'Сигнальная ракета Красная': '🔴', 'Сигнальная ракета Желтая': '🟡',
+            'Горн': '📯',
+        };
 
-            const container = document.getElementById('craft-container');
-            const countEl = document.getElementById('item-count');
-            const searchEl = document.getElementById('search-input');
-            const slider = document.getElementById('discount-slider');
-            const discDisplay = document.getElementById('discount-display');
-            const totalSaving = document.getElementById('total-saving');
-            const savingVal = document.getElementById('saving-val');
+        // Колонки-ресурсы из БД
+        const DB_RES_COLS = ['gold', 'wood', 'iron', 'copper', 'bronze', 'coal', 'tar', 'cloth', 'sail',
+            'plate_res', 'iron_ore', 'copper_ore', 'debris', 'animals', 'blueprint_frag',
+            'rum', 'supplies', 'fish', 'fresh_meat', 'whale_oil', 'battle_mark', 'voodoo_skull'];
 
-            function formatCost(val) {
-                return Math.round(val).toLocaleString('ru-RU');
-            }
+        let ALL_ITEMS = [];   // [{cat, name, cost, discount, time, res:{...}}]
+        let activeCategory = null;
+        let searchQuery = '';
+        let discount = 0;
 
-            function filtered() {
-                return CRAFT_DATA.filter(item => {
-                    if (activeCategory && item.cat !== activeCategory) return false;
-                    if (searchQuery && !item.name.toLowerCase().includes(searchQuery)) return false;
-                    return true;
-                });
-            }
+        // ===== Нормализация строки из БД =====
+        function dbRowToItem(row, catName) {
+            const res = {};
+            DB_RES_COLS.forEach(col => { if (row[col] > 0) res[col] = row[col]; });
+            return {
+                cat: catName,
+                name: row.name,
+                cost: row.craft_cost ?? 0,
+                hasDiscount: row.discount > 0,
+                time: row.craft_time ?? 0,
+                res,
+            };
+        }
 
-            function render() {
-                const items = filtered();
-                countEl.textContent = items.length;
+        // ===== Загрузка из Supabase =====
+        async function loadFromSupabase() {
+            const { data: cats, error: catErr } = await db.from('craft_categories').select('id,name');
+            if (catErr) throw catErr;
 
-                // Считаем экономию только по мастерским с скидкой
-                if (discount > 0) {
-                    const saving = items
-                        .filter(i => i.hasDiscount && i.cost)
-                        .reduce((sum, i) => sum + i.cost * (discount / 100), 0);
-                    if (saving > 0) {
-                        totalSaving.style.display = 'block';
-                        savingVal.textContent = `−${formatCost(saving)} ₽`;
-                    } else {
-                        totalSaving.style.display = 'none';
-                    }
-                } else {
-                    totalSaving.style.display = 'none';
-                }
+            const { data: items, error: itemErr } = await db
+                .from('craft_items')
+                .select('*')
+                .order('id');
+            if (itemErr) throw itemErr;
 
-                const byCat = {};
-                CATS_ORDER.forEach(c => byCat[c] = items.filter(i => i.cat === c));
+            const catMap = {};
+            cats.forEach(c => { catMap[c.id] = c.name; });
 
-                container.innerHTML = CATS_ORDER.map(cat => {
-                    const catItems = byCat[cat];
-                    if (!catItems.length) return '';
+            return items.map(row => dbRowToItem(row, catMap[row.category_id] || 'Разное'));
+        }
 
-                    const cards = catItems.map(item => {
-                        const resList = Object.entries(item.res || {})
-                            .filter(([, v]) => v > 0)
-                            .map(([k, v]) => {
-                                const r = RES_LABELS_CRAFT[k] || { label: k, emoji: '📦' };
-                                return `<div class="res-item" title="${r.label}">
-              <span class="res-emoji">${r.emoji}</span>
-              <span class="res-label">${r.label}</span>
-              <span class="res-value">${v.toLocaleString('ru-RU')}</span>
-            </div>`;
-                            }).join('');
+        // ===== Fallback локальные данные =====
+        const LOCAL_DATA = [
+            { cat: 'Мастерские', name: 'Балка', cost: 340, hasDiscount: true, time: 5, res: { wood: 100, iron: 5, copper: 4 } },
+            { cat: 'Мастерские', name: 'Бронза', cost: 608, hasDiscount: true, time: 6, res: { iron: 20, copper: 10, coal: 1 } },
+            { cat: 'Мастерские', name: 'Пластина', cost: 776, hasDiscount: true, time: 6, res: { iron: 30, coal: 15, cloth: 4 } },
+            { cat: 'Мастерские', name: 'Парусина', cost: 61, hasDiscount: true, time: 3, res: { coal: 1, cloth: 10 } },
+            { cat: 'Мастерские', name: 'Переборка', cost: 1289, hasDiscount: true, time: 5, res: { iron: 70, coal: 1 } },
+            { cat: 'Переработка', name: 'Железо', cost: 88, time: 1, res: { iron_ore: 10 } },
+            { cat: 'Переработка', name: 'Медь', cost: 24, time: 2, res: { copper_ore: 1 } },
+            { cat: 'Переработка', name: 'Уголь', cost: 8, time: 1, res: { debris: 2 } },
+            { cat: 'Переработка', name: 'Свежее мясо', cost: 12, time: 1, res: { animals: 1 } },
+            { cat: 'Переработка', name: '50 Ткани + 1 Кожа', cost: 120, time: 20, res: { animals: 10 } },
+            { cat: 'Разное', name: 'Сундук', cost: 500, time: 1, res: { gold: 500 } },
+            { cat: 'Разное', name: 'Имперский чертеж', cost: 2800000, time: 200, res: { gold: 100000, blueprint_frag: 100 } },
+            { cat: 'Разное', name: 'Порцион', cost: 71, time: 2, res: { rum: 1, supplies: 2, fresh_meat: 3 } },
+            { cat: 'Разное', name: 'Снасти', cost: 30.5, time: 1, res: { wood: 5, iron: 1 } },
+            { cat: 'Разное', name: 'Чугунные ядра', cost: 144, time: 1, res: { iron: 8 } },
+            { cat: 'Разное', name: 'Брандскугели', cost: 120, time: 1, res: { iron: 5, battle_mark: 2 } },
+            { cat: 'Разное', name: 'Бомбы осколочные', cost: 114, time: 1, res: { iron: 5, copper: 1 } },
+            { cat: 'Разное', name: 'Малые поджигающие бочки', cost: 400, time: 1, res: { wood: 100, whale_oil: 10 } },
+            { cat: 'Разное', name: 'Большие осколочные мины', cost: 4180, time: 1, res: { wood: 200, animals: 20 } },
+            { cat: 'Расходные предметы', name: 'Деревяные заплатки', cost: 25, res: { wood: 10 } },
+            { cat: 'Расходные предметы', name: 'Железные заплатки', cost: 540, res: { iron: 30 } },
+            { cat: 'Расходные предметы', name: 'Бронзовые заплатки', cost: 473.6, res: { bronze: 1 } },
+            { cat: 'Расходные предметы', name: 'Заплатки из обломков', cost: 600, res: { debris: 25, battle_mark: 1 } },
+            { cat: 'Расходные предметы', name: 'Деревянные ремонт-набор', cost: 50.6, res: { wood: 10, cloth: 8 } },
+            { cat: 'Расходные предметы', name: 'Железные ремонт-набор', cost: 492, res: { iron: 22, cloth: 30 } },
+            { cat: 'Расходные предметы', name: 'Бронзовый ремонт-набор', cost: 540.3, res: { bronze: 1, sail: 1 } },
+            { cat: 'Расходные предметы', name: 'Походный рацион', cost: 160, res: { gold: 100, rum: 10 } },
+            { cat: 'Расходные предметы', name: 'Малые добавочные паруса', cost: 40, res: { gold: 40 } },
+            { cat: 'Расходные предметы', name: 'Большие добавочные паруса', cost: 133.4, res: { sail: 2 } },
+            { cat: 'Расходные предметы', name: 'Малые пластины', cost: 540, res: { iron: 30 } },
+            { cat: 'Расходные предметы', name: 'Большие пластины', cost: 3217.2, res: { plate_res: 1, battle_mark: 5 } },
+            { cat: 'Расходные предметы', name: 'Дымовая бомба', cost: 5000, res: { battle_mark: 10 } },
+            { cat: 'Расходные предметы', name: 'Дымовая завеса', cost: 5720, res: { iron: 40, battle_mark: 10 } },
+            { cat: 'Расходные предметы', name: 'Подкуп', cost: 10000, res: { voodoo_skull: 1 } },
+            { cat: 'Расходные предметы', name: 'Черные двойной порох', cost: 60, res: { gold: 60 } },
+            { cat: 'Расходные предметы', name: 'Красный двойной порох', cost: 60, res: { gold: 60 } },
+            { cat: 'Расходные предметы', name: 'Белый двойной порох', cost: 60, res: { gold: 60 } },
+            { cat: 'Расходные предметы', name: 'Ром-паёк', cost: 120, res: { rum: 20 } },
+            { cat: 'Расходные предметы', name: 'Сытный паёк', cost: 400, res: { fish: 20, fresh_meat: 40 } },
+            { cat: 'Расходные предметы', name: 'Фосфор', cost: 2150, res: { gold: 150, battle_mark: 4 } },
+            { cat: 'Расходные предметы', name: 'Пороховой заряд', cost: 2150, res: { gold: 150, battle_mark: 4 } },
+            { cat: 'Расходные предметы', name: 'Крюк Посейдона', cost: 15000, res: { gold: 5000, voodoo_skull: 1 } },
+            { cat: 'Расходные предметы', name: 'Сигнальная ракета Синяя', cost: 130, res: { gold: 130 } },
+            { cat: 'Расходные предметы', name: 'Сигнальная ракета Красная', cost: 200, res: { gold: 200 } },
+            { cat: 'Расходные предметы', name: 'Сигнальная ракета Желтая', cost: 5000, res: { battle_mark: 10 } },
+            { cat: 'Расходные предметы', name: 'Горн', cost: 10000, res: { voodoo_skull: 1 } },
+        ];
 
-                        const timeBadge = item.time ? `<span class="badge badge-type">⏱ ${item.time} мин</span>` : '';
+        // ===== Рендер =====
+        function fmt(n) { return Math.round(n).toLocaleString('ru-RU'); }
 
-                        // Стоимость с учётом скидки
-                        let costHtml = '';
-                        if (item.cost) {
-                            const base = item.cost;
-                            const discounted = item.hasDiscount && discount > 0
-                                ? base * (1 - discount / 100)
-                                : null;
+        function filtered() {
+            return ALL_ITEMS.filter(item =>
+                (!activeCategory || item.cat === activeCategory) &&
+                (!searchQuery || item.name.toLowerCase().includes(searchQuery))
+            );
+        }
 
-                            if (discounted !== null) {
-                                costHtml = `
-              <div class="craft-cost-block">
-                <div class="craft-cost-base" style="text-decoration:line-through;opacity:.5;font-size:11px">${formatCost(base)} ₽</div>
-                <div class="craft-cost-disc" style="display:block;color:#4ade80;font-size:13px;font-weight:800">${formatCost(discounted)} ₽</div>
-                <div class="craft-cost-label">со скидкой ${discount}%</div>
-              </div>`;
-                            } else {
-                                costHtml = `
-              <div class="craft-cost-block">
-                <div class="craft-cost-base">${formatCost(base)} ₽</div>
-                ${item.hasDiscount
-                                        ? '<div class="craft-cost-label" style="color:var(--gold-light)">✓ учитывает скидку</div>'
-                                        : '<div class="craft-cost-label">примерная себестоимость</div>'}
-              </div>`;
-                            }
-                        }
+        function render() {
+            const items = filtered();
+            document.getElementById('item-count').textContent = items.length;
 
-                        const discBadge = item.hasDiscount
-                            ? `<span class="badge" style="background:rgba(74,222,128,0.1);color:#4ade80;border:1px solid rgba(74,222,128,0.25)">🏷️ Скидка</span>`
-                            : '';
+            // Экономия
+            const savEl = document.getElementById('total-saving');
+            if (discount > 0) {
+                const saving = items.filter(i => i.hasDiscount && i.cost)
+                    .reduce((s, i) => s + i.cost * (discount / 100), 0);
+                if (saving > 0) { savEl.style.display = 'block'; document.getElementById('saving-val').textContent = `−${fmt(saving)} ₽`; }
+                else savEl.style.display = 'none';
+            } else savEl.style.display = 'none';
 
-                        return `
-          <div class="craft-card">
-            ${costHtml}
-            <div class="craft-header">
-              <div class="craft-icon">${item.icon || '📦'}</div>
-              <div>
-                <div class="craft-name">${item.name}</div>
-                <div class="craft-meta">${timeBadge}${discBadge}</div>
-              </div>
-            </div>
-            <div class="res-title">Ингредиенты</div>
-            <div class="res-grid">${resList || '<span style="color:var(--text-muted);font-size:12px">— нет данных —</span>'}</div>
-          </div>`;
+            const byCat = {};
+            CATS_ORDER.forEach(c => byCat[c] = items.filter(i => i.cat === c));
+
+            document.getElementById('craft-container').innerHTML = CATS_ORDER.map(cat => {
+                const catItems = byCat[cat];
+                if (!catItems.length) return '';
+
+                const cards = catItems.map(item => {
+                    const icon = ITEM_ICONS[item.name] || '📦';
+                    const resList = Object.entries(item.res || {}).filter(([, v]) => v > 0).map(([k, v]) => {
+                        const r = RES_LABELS_CRAFT[k] || { label: k, emoji: '📦' };
+                        return `<div class="res-item" title="${r.label}"><span class="res-emoji">${r.emoji}</span><span class="res-label">${r.label}</span><span class="res-value">${v.toLocaleString('ru-RU')}</span></div>`;
                     }).join('');
 
-                    return `
-        <h2 class="section-header">${CAT_ICONS[cat]} ${cat}</h2>
-        <div class="craft-grid">${cards}</div>`;
+                    const timeBadge = item.time > 0 ? `<span class="badge badge-type">⏱ ${item.time} мин</span>` : '';
+                    const discBadge = item.hasDiscount
+                        ? `<span class="badge" style="background:rgba(74,222,128,0.1);color:#4ade80;border:1px solid rgba(74,222,128,0.25)">🏷️ Скидка</span>`
+                        : '';
+
+                    let costHtml = '';
+                    if (item.cost) {
+                        const discounted = item.hasDiscount && discount > 0 ? item.cost * (1 - discount / 100) : null;
+                        costHtml = `<div class="craft-cost-block">
+          ${discounted !== null
+                                ? `<div class="craft-cost-base" style="text-decoration:line-through;opacity:.4;font-size:11px">${fmt(item.cost)} ₽</div>
+               <div style="color:#4ade80;font-size:13px;font-weight:800">${fmt(discounted)} ₽</div>
+               <div class="craft-cost-label">со скидкой ${discount}%</div>`
+                                : `<div class="craft-cost-base">${fmt(item.cost)} ₽</div>
+               <div class="craft-cost-label">${item.hasDiscount ? '<span style="color:var(--gold-light)">✓ скидка</span>' : 'себестоимость'}</div>`}
+        </div>`;
+                    }
+
+                    return `<div class="craft-card">${costHtml}
+        <div class="craft-header">
+          <div class="craft-icon">${icon}</div>
+          <div><div class="craft-name">${item.name}</div><div class="craft-meta">${timeBadge}${discBadge}</div></div>
+        </div>
+        <div class="res-title">Ингредиенты</div>
+        <div class="res-grid">${resList || '<span style="color:var(--text-muted);font-size:12px">— нет данных —</span>'}</div>
+      </div>`;
                 }).join('');
+
+                return `<h2 class="section-header">${CAT_ICONS[cat]} ${cat}</h2><div class="craft-grid">${cards}</div>`;
+            }).join('');
+        }
+
+        // ===== Инициализация =====
+        async function init() {
+            const loader = document.getElementById('loader');
+            const cont = document.getElementById('craft-container');
+            const srcEl = document.getElementById('src-indicator');
+
+            try {
+                ALL_ITEMS = await loadFromSupabase();
+                srcEl.innerHTML = '<span class="data-source live">🟢 Supabase</span>';
+            } catch (e) {
+                console.warn('Supabase недоступен, используем локальные данные:', e);
+                ALL_ITEMS = LOCAL_DATA;
+                srcEl.innerHTML = '<span class="data-source local">🟡 Локальные данные</span>';
             }
 
-            // ===== СЛАЙДЕР СКИДКИ =====
-            function setDiscount(val) {
-                discount = parseInt(val);
-                slider.value = discount;
-                discDisplay.textContent = discount + '%';
-                discDisplay.className = 'discount-value' + (discount === 35 ? ' max' : '');
-                document.querySelectorAll('.preset-btn').forEach(b => {
-                    b.classList.toggle('active', parseInt(b.dataset.val) === discount);
-                });
-                render();
-            }
+            loader.style.display = 'none';
+            cont.style.display = 'block';
 
-            slider.addEventListener('input', () => setDiscount(slider.value));
-
-            document.querySelectorAll('.preset-btn').forEach(btn => {
-                btn.addEventListener('click', () => setDiscount(btn.dataset.val));
-            });
-
-            // ===== КНОПКИ КАТЕГОРИЙ =====
-            const catContainer = document.getElementById('cat-filters');
+            // Кнопки категорий
+            const catCont = document.getElementById('cat-filters');
             CATS_ORDER.forEach(c => {
                 const btn = document.createElement('button');
                 btn.className = 'btn-filter';
@@ -527,23 +552,37 @@
                     if (activeCategory) btn.classList.add('active');
                     render();
                 });
-                catContainer.appendChild(btn);
+                catCont.appendChild(btn);
             });
+
+            // Слайдер
+            function setDiscount(val) {
+                discount = parseInt(val);
+                document.getElementById('discount-slider').value = discount;
+                const disp = document.getElementById('discount-display');
+                disp.textContent = discount + '%';
+                disp.className = 'discount-value' + (discount === 35 ? ' max' : '');
+                document.querySelectorAll('.preset-btn').forEach(b =>
+                    b.classList.toggle('active', parseInt(b.dataset.val) === discount));
+                render();
+            }
+            document.getElementById('discount-slider').addEventListener('input', e => setDiscount(e.target.value));
+            document.querySelectorAll('.preset-btn').forEach(b => b.addEventListener('click', () => setDiscount(b.dataset.val)));
 
             document.getElementById('btn-reset').addEventListener('click', () => {
                 activeCategory = null; searchQuery = '';
-                searchEl.value = '';
+                document.getElementById('search-input').value = '';
                 setDiscount(0);
                 document.querySelectorAll('#cat-filters .btn-filter').forEach(b => b.classList.remove('active'));
             });
-
-            searchEl.addEventListener('input', function () {
-                searchQuery = this.value.toLowerCase().trim();
-                render();
+            document.getElementById('search-input').addEventListener('input', function () {
+                searchQuery = this.value.toLowerCase().trim(); render();
             });
 
             render();
-        })();
+        }
+
+        init();
     </script>
 </body>
 
