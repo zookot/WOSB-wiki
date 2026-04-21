@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Корабли — WOSB Wiki</title>
+  <meta name="description" content="Справочник кораблей World of Sea Battle: стоимость крафта, ресурсы, фракции">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <a href="index.html" class="logo">
+      <span class="logo-anchor">⚓</span>
+      WOSB Wiki
+    </a>
+    <nav>
+      <a href="index.html" class="active">
+        🚢 <span class="nav-text">Корабли</span>
+      </a>
+      <a href="craft.html">
+        🔨 <span class="nav-text">Крафт</span>
+      </a>
+      <a href="calculator.html">
+        🧮 <span class="nav-text">Калькулятор</span>
+      </a>
+      <a href="guns.html">
+        💣 <span class="nav-text">Орудия</span>
+      </a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <div class="page-header">
+    <h1 class="page-title">🚢 Корабли</h1>
+    <p class="page-subtitle">Стоимость крафта, ресурсы и фракции всех кораблей</p>
+  </div>
+
+  <!-- Фильтры -->
+  <div class="filters">
+
+    <div class="filter-group">
+      <div class="filter-label">🔍 Поиск</div>
+      <input type="text" id="search-input" placeholder="Название корабля...">
+    </div>
+
+    <div class="filter-group">
+      <div class="filter-label">⛵ Класс</div>
+      <div class="btn-group" id="type-filters"></div>
+    </div>
+
+    <div class="filter-group">
+      <div class="filter-label">🏴 Фракция</div>
+      <div class="btn-group" id="faction-filters"></div>
+    </div>
+
+    <div class="filter-group">
+      <div class="filter-label">⭐ Ранг</div>
+      <div class="btn-group" id="rank-filters"></div>
+    </div>
+
+    <button class="btn-reset" id="btn-reset">↺ Сбросить</button>
+  </div>
+
+  <!-- Статистика и переключатели -->
+  <div class="stats-bar">
+    <div class="stat-chip">Найдено: <span id="ship-count">0</span> кораблей</div>
+
+    <div class="discount-toggle">
+      <span class="toggle-label" id="discount-label">Без скидки</span>
+      <div class="toggle-switch" id="discount-toggle">
+        <div class="toggle-knob"></div>
+      </div>
+    </div>
+
+    <div class="view-toggle">
+      <button class="btn-view active" id="btn-card" title="Карточки">⊞</button>
+      <button class="btn-view" id="btn-table" title="Список">☰</button>
+    </div>
+  </div>
+
+  <!-- Сетка кораблей -->
+  <div id="ships-grid"></div>
+</main>
+
+<script src="js/data.js"></script>
+<script src="js/ships.js"></script>
+</body>
+</html>
