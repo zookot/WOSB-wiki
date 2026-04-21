@@ -1,91 +1,100 @@
 <!DOCTYPE html>
 <html lang="ru">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Корабли — WOSB Wiki</title>
   <meta name="description" content="Справочник кораблей World of Sea Battle: стоимость крафта, ресурсы, фракции">
   <link rel="stylesheet" href="css/style.css">
+  <!-- Supabase CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
+
 <body>
 
-<header>
-  <div class="header-inner">
-    <a href="index.html" class="logo">
-      <span class="logo-anchor">⚓</span>
-      WOSB Wiki
-    </a>
-    <nav>
-      <a href="index.html" class="active">
-        🚢 <span class="nav-text">Корабли</span>
+  <header>
+    <div class="header-inner">
+      <a href="index.html" class="logo">
+        <span class="logo-anchor">⚓</span>
+        WOSB Wiki
       </a>
-      <a href="craft.html">
-        🔨 <span class="nav-text">Крафт</span>
-      </a>
-      <a href="calculator.html">
-        🧮 <span class="nav-text">Калькулятор</span>
-      </a>
-      <a href="guns.html">
-        💣 <span class="nav-text">Орудия</span>
-      </a>
-    </nav>
-  </div>
-</header>
+      <nav>
+        <a href="index.html" class="active">🚢 <span class="nav-text">Корабли</span></a>
+        <a href="craft.html">🔨 <span class="nav-text">Крафт</span></a>
+        <a href="calculator.html">🧮 <span class="nav-text">Калькулятор</span></a>
+        <a href="guns.html">💣 <span class="nav-text">Орудия</span></a>
+      </nav>
+    </div>
+  </header>
 
-<main>
-  <div class="page-header">
-    <h1 class="page-title">🚢 Корабли</h1>
-    <p class="page-subtitle">Стоимость крафта, ресурсы и фракции всех кораблей</p>
-  </div>
-
-  <!-- Фильтры -->
-  <div class="filters">
-
-    <div class="filter-group">
-      <div class="filter-label">🔍 Поиск</div>
-      <input type="text" id="search-input" placeholder="Название корабля...">
+  <main>
+    <div class="page-header">
+      <h1 class="page-title">🚢 Корабли</h1>
+      <p class="page-subtitle">Стоимость крафта, ресурсы и фракции всех кораблей</p>
     </div>
 
-    <div class="filter-group">
-      <div class="filter-label">⛵ Класс</div>
-      <div class="btn-group" id="type-filters"></div>
+    <!-- Фильтры -->
+    <div class="filters">
+      <div class="filter-group">
+        <div class="filter-label">🔍 Поиск</div>
+        <input type="text" id="search-input" placeholder="Название корабля...">
+      </div>
+      <div class="filter-group">
+        <div class="filter-label">⛵ Класс</div>
+        <div class="btn-group" id="type-filters"></div>
+      </div>
+      <div class="filter-group">
+        <div class="filter-label">🏴 Фракция</div>
+        <div class="btn-group" id="faction-filters"></div>
+      </div>
+      <div class="filter-group">
+        <div class="filter-label">⭐ Ранг</div>
+        <div class="btn-group" id="rank-filters"></div>
+      </div>
+      <button class="btn-reset" id="btn-reset">↺ Сбросить</button>
     </div>
 
-    <div class="filter-group">
-      <div class="filter-label">🏴 Фракция</div>
-      <div class="btn-group" id="faction-filters"></div>
-    </div>
+    <!-- Статистика -->
+    <div class="stats-bar">
+      <div class="stat-chip">Найдено: <span id="ship-count">...</span> кораблей</div>
 
-    <div class="filter-group">
-      <div class="filter-label">⭐ Ранг</div>
-      <div class="btn-group" id="rank-filters"></div>
-    </div>
+      <div class="discount-toggle">
+        <span class="toggle-label" id="discount-label">Без скидки</span>
+        <div class="toggle-switch" id="discount-toggle">
+          <div class="toggle-knob"></div>
+        </div>
+      </div>
 
-    <button class="btn-reset" id="btn-reset">↺ Сбросить</button>
-  </div>
-
-  <!-- Статистика и переключатели -->
-  <div class="stats-bar">
-    <div class="stat-chip">Найдено: <span id="ship-count">0</span> кораблей</div>
-
-    <div class="discount-toggle">
-      <span class="toggle-label" id="discount-label">Без скидки</span>
-      <div class="toggle-switch" id="discount-toggle">
-        <div class="toggle-knob"></div>
+      <div class="view-toggle">
+        <button class="btn-view active" id="btn-card" title="Карточки">⊞</button>
+        <button class="btn-view" id="btn-table" title="Список">☰</button>
       </div>
     </div>
 
-    <div class="view-toggle">
-      <button class="btn-view active" id="btn-card" title="Карточки">⊞</button>
-      <button class="btn-view" id="btn-table" title="Список">☰</button>
+    <!-- Загрузчик -->
+    <div id="loader"
+      style="display:none; justify-content:center; padding:60px; color:var(--text-muted); gap:12px; align-items:center;">
+      <span style="font-size:28px; animation:spin 1s linear infinite">⚓</span>
+      <span>Загружаем данные...</span>
     </div>
-  </div>
 
-  <!-- Сетка кораблей -->
-  <div id="ships-grid"></div>
-</main>
+    <!-- Сетка кораблей -->
+    <div id="ships-grid"></div>
+  </main>
 
-<script src="js/data.js"></script>
-<script src="js/ships.js"></script>
+  <style>
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+  </style>
+
+  <!-- Данные и логика -->
+  <script src="js/data.js"></script> <!-- Локальные данные (fallback) -->
+  <script src="js/config.js"></script> <!-- Supabase клиент -->
+  <script src="js/ships.js"></script> <!-- Логика страницы -->
 </body>
+
 </html>

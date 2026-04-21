@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Крафт — WOSB Wiki</title>
+    <meta name="description" content="Рецепты крафта World of Sea Battle: мастерские, переработка, расходные предметы">
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .craft-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 14px;
+        }
+
+        .craft-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 18px;
+            transition: all 0.2s;
+            cursor: default;
+            position: relative;
+        }
+
+        .craft-card:hover {
+            border-color: var(--accent);
+            background: var(--bg-hover);
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .craft-header {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            margin-bottom: 14px;
+        }
+
+        .craft-icon {
+            width: 42px;
+            height: 42px;
+            border-radius: 8px;
+            background: linear-gradient(135deg, var(--bg-dark), rgba(30, 111, 168, 0.2));
+            border: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            flex-shrink: 0;
+        }
+
+        .craft-name {
+            font-size: 15px;
+            font-weight: 600;
+            color: #e8f4ff;
+            margin-bottom: 4px;
+        }
+
+        .craft-meta {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .craft-cost {
+            position: absolute;
+            top: 14px;
+            right: 14px;
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--gold-light);
+            text-align: right;
+        }
+
+        .section-header {
+            font-family: 'Cinzel', serif;
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--gold);
+            margin: 28px 0 14px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .section-header::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: linear-gradient(90deg, var(--gold)44, transparent);
+        }
+    </style>
+</head>
+
+<body>
+
+    <header>
+        <div class="header-inner">
+            <a href="index.html" class="logo"><span class="logo-anchor">⚓</span> WOSB Wiki</a>
+            <nav>
+                <a href="index.html">🚢 <span class="nav-text">Корабли</span></a>
+                <a href="craft.html" class="active">🔨 <span class="nav-text">Крафт</span></a>
+                <a href="calculator.html">🧮 <span class="nav-text">Калькулятор</span></a>
+                <a href="guns.html">💣 <span class="nav-text">Орудия</span></a>
+            </nav>
+        </div>
+    </header>
+
+    <main>
+        <div class="page-header">
+            <h1 class="page-title">🔨 Крафт</h1>
+            <p class="page-subtitle">Рецепты мастерских, переработки, расходных предметов и боеприпасов</p>
+        </div>
+
+        <!-- Фильтры -->
+        <div class="filters" style="margin-bottom:24px;">
+            <div class="filter-group">
+                <div class="filter-label">🔍 Поиск</div>
+                <input type="text" id="search-input" placeholder="Название предмета...">
+            </div>
+            <div class="filter-group">
+                <div class="filter-label">📋 Категория</div>
+                <div class="btn-group" id="cat-filters"></div>
+            </div>
+            <button class="btn-reset" id="btn-reset">↺ Сбросить</button>
+        </div>
+
+        <div class="stats-bar">
+            <div class="stat-chip">Найдено: <span id="item-count">0</span> рецептов</div>
+        </div>
+
+        <div id="craft-container"></div>
+    </main>
+
+    <script>
+        // ===== Данные крафта из Excel =====
+        const CRAFT_DATA = [
+            // Мастерские
+            {
+                cat: 'Мастерские', name: 'Балка', icon: '🔩',
+                cost: 272, discount: 0.20, time: 5,
+                res: { wood: 80, iron: 0, copper: 4, coal: 0, cloth: 0, sail: 0 }
+            },
+            {
+                cat: 'Мастерские', name: 'Бронза', icon: '🥉',
+                cost: 486.4, discount: 0.20, time: 6,
+                res: { iron: 16, copper: 8, coal: 1 }
+            },
+            {
+                cat: 'Мастерские', name: 'Пластина', icon: '🔘',
+                cost: 620.8, discount: 0.20, time: 6,
+                res: { iron: 24, coal: 12, cloth: 3 }
+            },
+            {
+                cat: 'Мастерские', name: 'Парусина', icon: '⛵',
+                cost: 48.8, discount: 0.20, time: 3,
+                res: { coal: 1, cloth: 8 }
+            },
+            {
+                cat: 'Мастерские', name: 'Переборка', icon: '🛡️',
+                cost: 1031.2, discount: 0.20, time: 5,
+                res: { iron: 56, coal: 1 }
+            },
+
+            // Переработка
+            {
+                cat: 'Переработка', name: 'Железо', icon: '⚙️',
+                cost: 88, time: 1,
+                res: { iron_ore: 10 }
+            },
+            {
+                cat: 'Переработка', name: 'Медь', icon: '🔶',
+                cost: 24, time: 2,
+                res: { copper_ore: 1 }
+            },
+            {
+                cat: 'Переработка', name: 'Уголь', icon: '⬛',
+                cost: 8, time: 1,
+                res: { debris: 2 }
+            },
+            {
+                cat: 'Переработка', name: 'Свежее мясо', icon: '🥩',
+                cost: 12, time: 1,
+                res: { animals: 1 }
+            },
+
+            // Расходные предметы
+            { cat: 'Расходные предметы', name: 'Деревяные заплатки', icon: '🪵', res: { wood: 10 } },
+            { cat: 'Расходные предметы', name: 'Железные заплатки', icon: '⚙️', res: { iron: 30 } },
+            { cat: 'Расходные предметы', name: 'Бронзовые заплатки', icon: '🥉', res: { bronze: 1 } },
+            { cat: 'Расходные предметы', name: 'Заплатки из обломков', icon: '🗑️', res: { debris: 25, battle_mark: 1 } },
+            { cat: 'Расходные предметы', name: 'Деревянные ремонт-набор', icon: '🪵', res: { wood: 10, cloth: 8 } },
+            { cat: 'Расходные предметы', name: 'Железные ремонт-набор', icon: '⚙️', res: { iron: 22, cloth: 30 } },
+            { cat: 'Расходные предметы', name: 'Бронзовый ремонт-набор', icon: '🥉', res: { bronze: 1, sail: 1 } },
+            { cat: 'Расходные предметы', name: 'Малые добавочные паруса', icon: '⛵', res: { gold: 40 } },
+            { name: 'Большие добавочные паруса', icon: '⛵', cat: 'Расходные предметы', res: { sail: 2 } },
+            { name: 'Малые пластины', icon: '🔘', cat: 'Расходные предметы', res: { iron: 30 } },
+            { name: 'Большие пластины', icon: '🔘', cat: 'Расходные предметы', res: { plate: 1, battle_mark: 5 } },
+            { name: 'Дымовая бомба', icon: '💨', cat: 'Расходные предметы', res: { battle_mark: 10 } },
+            { name: 'Дымовая завеса', icon: '💨', cat: 'Расходные предметы', res: { iron: 40, battle_mark: 10 } },
+            { name: 'Подкуп', icon: '💀', cat: 'Расходные предметы', res: { voodoo_skull: 1 } },
+            { name: 'Ром-паёк', icon: '🍺', cat: 'Расходные предметы', res: { rum: 20 } },
+            { name: 'Сытный паёк', icon: '🍖', cat: 'Расходные предметы', res: { fish: 20, fresh_meat: 40 } },
+
+            // Разное
+            { cat: 'Разное', name: 'Сундук', icon: '📦', cost: 500, res: { gold: 500 } },
+            { cat: 'Разное', name: 'Имперский чертеж', icon: '📋', cost: 2800000, time: 200, res: { gold: 100000, blueprint_frag: 100 } },
+            { cat: 'Разное', name: 'Порцион', icon: '🥘', cost: 71, time: 2, res: { rum: 1, supplies: 2, fresh_meat: 3 } },
+            { cat: 'Разное', name: 'Снасти', icon: '🔗', cost: 30.5, time: 1, res: { wood: 5, iron: 1 } },
+            { cat: 'Разное', name: 'Чугунные ядра', icon: '⚫', cost: 144, time: 1, res: { iron: 8 } },
+            { cat: 'Разное', name: 'Брандскугели', icon: '🔴', cost: 120, time: 1, res: { iron: 5, battle_mark: 2 } },
+            { cat: 'Разное', name: 'Бомбы осколочные', icon: '💥', cost: 114, time: 1, res: { iron: 5, cloth: 1 } },
+            { cat: 'Разное', name: 'Малые поджигающие бочки', icon: '🛢️', cost: 400, time: 1, res: { wood: 100, whale_oil: 10 } },
+            { cat: 'Разное', name: 'Большие осколочные мины', icon: '💣', cost: 4180, time: 1, res: { wood: 200, animals: 20 } },
+        ];
+
+        const RES_LABELS_CRAFT = {
+            wood: { label: 'Дерево', emoji: '🪵' },
+            iron: { label: 'Железо', emoji: '⚙️' },
+            copper: { label: 'Медь', emoji: '🔶' },
+            coal: { label: 'Уголь', emoji: '⬛' },
+            cloth: { label: 'Ткань', emoji: '🧵' },
+            sail: { label: 'Парусина', emoji: '⛵' },
+            iron_ore: { label: 'Железная руда', emoji: '🪨' },
+            copper_ore: { label: 'Медная руда', emoji: '🟤' },
+            debris: { label: 'Обломки', emoji: '🗑️' },
+            animals: { label: 'Животные', emoji: '🐄' },
+            gold: { label: 'Золото', emoji: '💰' },
+            battle_mark: { label: 'Боевая марка', emoji: '⚔️' },
+            blueprint_frag: { label: 'Фрагмент чертежа', emoji: '📜' },
+            rum: { label: 'Ром', emoji: '🍺' },
+            supplies: { label: 'Припасы', emoji: '📦' },
+            fresh_meat: { label: 'Свежее мясо', emoji: '🥩' },
+            fish: { label: 'Рыба', emoji: '🐟' },
+            whale_oil: { label: 'Китовый жир', emoji: '🐋' },
+            voodoo_skull: { label: 'Череп Вуду', emoji: '💀' },
+            bronze: { label: 'Бронза', emoji: '🥉' },
+            plate: { label: 'Пластина', emoji: '🔘' },
+        };
+
+        const CAT_ICONS = {
+            'Мастерские': '🏭',
+            'Переработка': '♻️',
+            'Расходные предметы': '🎒',
+            'Разное': '📦',
+        };
+
+        (function () {
+            let activeCategory = null;
+            let searchQuery = '';
+
+            const container = document.getElementById('craft-container');
+            const countEl = document.getElementById('item-count');
+            const searchEl = document.getElementById('search-input');
+
+            function filtered() {
+                return CRAFT_DATA.filter(item => {
+                    if (activeCategory && item.cat !== activeCategory) return false;
+                    if (searchQuery && !item.name.toLowerCase().includes(searchQuery)) return false;
+                    return true;
+                });
+            }
+
+            function render() {
+                const items = filtered();
+                countEl.textContent = items.length;
+
+                const cats = ['Мастерские', 'Переработка', 'Расходные предметы', 'Разное'];
+                const byCat = {};
+                cats.forEach(c => byCat[c] = items.filter(i => i.cat === c));
+
+                container.innerHTML = cats.map(cat => {
+                    const catItems = byCat[cat];
+                    if (!catItems.length) return '';
+
+                    const cards = catItems.map(item => {
+                        const resList = Object.entries(item.res || {})
+                            .filter(([, v]) => v > 0)
+                            .map(([k, v]) => {
+                                const r = RES_LABELS_CRAFT[k] || { label: k, emoji: '📦' };
+                                return `<div class="res-item" title="${r.label}">
+              <span class="res-emoji">${r.emoji}</span>
+              <span class="res-label">${r.label}</span>
+              <span class="res-value">${v.toLocaleString('ru-RU')}</span>
+            </div>`;
+                            }).join('');
+
+                        const discBadge = item.discount
+                            ? `<span class="badge badge-faction">-${Math.round(item.discount * 100)}%</span>`
+                            : '';
+                        const timeBadge = item.time
+                            ? `<span class="badge badge-type">⏱ ${item.time} мин</span>`
+                            : '';
+
+                        const costStr = item.cost
+                            ? `<div style="color:var(--gold-light);font-size:12px;font-weight:700">${item.cost.toLocaleString('ru-RU')} ₽</div>`
+                            : '';
+
+                        return `
+          <div class="craft-card">
+            ${costStr ? `<div class="craft-cost">${costStr}</div>` : ''}
+            <div class="craft-header">
+              <div class="craft-icon">${item.icon || '📦'}</div>
+              <div>
+                <div class="craft-name">${item.name}</div>
+                <div class="craft-meta">${timeBadge}${discBadge}</div>
+              </div>
+            </div>
+            <div class="res-title">Ингредиенты</div>
+            <div class="res-grid">${resList || '<span style="color:var(--text-muted);font-size:12px">— нет данных —</span>'}</div>
+          </div>`;
+                    }).join('');
+
+                    return `
+        <h2 class="section-header">${CAT_ICONS[cat]} ${cat}</h2>
+        <div class="craft-grid">${cards}</div>`;
+                }).join('');
+            }
+
+            // Кнопки категорий
+            const cats = ['Мастерские', 'Переработка', 'Расходные предметы', 'Разное'];
+            const catContainer = document.getElementById('cat-filters');
+            cats.forEach(c => {
+                const btn = document.createElement('button');
+                btn.className = 'btn-filter';
+                btn.innerHTML = `${CAT_ICONS[c]} ${c}`;
+                btn.addEventListener('click', () => {
+                    activeCategory = activeCategory === c ? null : c;
+                    document.querySelectorAll('#cat-filters .btn-filter').forEach(b => b.classList.remove('active', 'active-type'));
+                    if (activeCategory) btn.classList.add('active');
+                    render();
+                });
+                catContainer.appendChild(btn);
+            });
+
+            document.getElementById('btn-reset').addEventListener('click', () => {
+                activeCategory = null; searchQuery = '';
+                searchEl.value = '';
+                document.querySelectorAll('.btn-filter').forEach(b => b.classList.remove('active', 'active-type'));
+                render();
+            });
+
+            searchEl.addEventListener('input', function () {
+                searchQuery = this.value.toLowerCase().trim();
+                render();
+            });
+
+            render();
+        })();
+    </script>
+</body>
+
+</html>
