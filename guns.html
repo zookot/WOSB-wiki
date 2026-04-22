@@ -176,18 +176,7 @@
     <script src="js/config.js"></script>
     <script src="js/guns_data.js"></script>
     <script>
-        const GUN_TYPE_ICONS = {
-            'Пушка': '💥', 'Кульверина': '🎯', 'Карронада': '💣', 'Бомбарда': '🔥', 'Мортира': '🏹'
-        };
-        const GUN_RES_LABELS = {
-            gold: { label: 'Золото', emoji: '💰' },
-            iron: { label: 'Железо', emoji: '⚙️' },
-            copper: { label: 'Медь', emoji: '🔶' },
-            bronze: { label: 'Бронза', emoji: '🥉' },
-            rum: { label: 'Ром', emoji: '🍺' },
-            volcanic: { label: 'Вулканическая', emoji: '🌋' },
-            pirate_token: { label: 'Пиратский жетон', emoji: '🏴‍☠️' },
-        };
+        // GUN_TYPE_ICONS и GUN_RES_LABELS загружаются из guns_data.js
         const GUN_RES_COLS = ['gold', 'iron', 'copper', 'bronze', 'rum', 'volcanic', 'pirate_token'];
 
         let ALL_GUNS = [];
@@ -212,7 +201,7 @@
         function localGuns() {
             return GUNS.map(g => {
                 const res = {};
-                Object.keys(GUN_RES_LABELS).forEach(k => { if (g[k] > 0) res[k] = g[k]; });
+                GUN_RES_COLS.forEach(k => { if (g[k] > 0) res[k] = g[k]; });
                 return { name: g.name, type: g.type, qty: g.qty || 1, cost: g.cost || 0, res };
             });
         }
