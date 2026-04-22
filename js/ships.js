@@ -50,6 +50,7 @@
         });
         return {
             name: s.name, rank: s.rank, type: s.type, faction: s.faction,
+            img: s.img || null,
             discount: s.discount, res, disc
         };
     }
@@ -161,7 +162,9 @@
         return `
       <div class="ship-card${isTable ? ' table-row' : ''}">
         <div class="card-header">
-          <div class="ship-avatar">${typeIcon}</div>
+          <div class="ship-avatar">${s.img
+                ? `<img src="resources/${s.img}" alt="${s.name}" style="width:100%;height:100%;object-fit:contain;border-radius:8px;">`
+                : typeIcon}</div>
           <div class="ship-info">
             <div class="ship-name">${s.name}</div>
             <div class="ship-tags">
