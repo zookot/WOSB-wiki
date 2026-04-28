@@ -436,7 +436,7 @@
         function dbToGun(row) {
             const res = {};
             GUN_RES_COLS.forEach(c => { if (row[c] > 0) res[c] = row[c]; });
-            return { name: row.name, type: row.type, qty: row.qty || 1, cost: row.craft_cost || 0, res };
+            return { name: row.name, type: row.type, qty: row.qty || 1, cost: row.craft_cost || 0, res, market_price: row.market_price || 0 };
         }
 
         async function loadGuns() {
