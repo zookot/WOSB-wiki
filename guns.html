@@ -213,45 +213,51 @@
             color: var(--accent2);
         }
 
+@keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .page-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 20px;
+        }
+
         .profit-calculator {
             background: linear-gradient(135deg, rgba(74, 222, 128, 0.08), rgba(201, 162, 39, 0.08));
             border: 1px solid rgba(74, 222, 128, 0.25);
             border-radius: 10px;
-            padding: 12px 20px;
-            margin-bottom: 20px;
+            padding: 10px 16px;
             display: flex;
             align-items: center;
-            gap: 16px;
-            flex-wrap: wrap;
+            gap: 12px;
         }
 
         .profit-calculator-label {
-            font-size: 13px;
+            font-size: 12px;
             font-weight: 600;
             color: #4ade80;
-            display: flex;
-            align-items: center;
-            gap: 8px;
         }
 
         .profit-calculator-value {
-            font-size: 18px;
+            font-size: 16px;
             font-weight: 700;
             color: var(--gold-light);
-            margin-left: auto;
         }
 
         .profit-clear-btn {
-            padding: 6px 14px;
+            padding: 4px 10px;
             border-radius: 6px;
-            font-size: 12px;
+            font-size: 11px;
             font-weight: 600;
             background: rgba(248, 113, 113, 0.15);
             border: 1px solid rgba(248, 113, 113, 0.35);
             color: #f87171;
             cursor: pointer;
             transition: all 0.2s;
-            flex-shrink: 0;
         }
 
         .profit-clear-btn:hover {
@@ -378,16 +384,17 @@
 
     <main>
         <div class="page-header">
-            <h1 class="page-title">💣 Орудия</h1>
-            <p class="page-subtitle">Стоимость крафта и ресурсы для всех орудий</p>
-        </div>
-
-        <div class="profit-calculator" id="profit-calculator">
-            <div class="profit-calculator-label">
-                <span>💰</span> Сумма выбранных орудий:
-                <div class="profit-calculator-value" id="profit-total">0 🪙</div>
+            <div>
+                <h1 class="page-title">💣 Орудия</h1>
+                <p class="page-subtitle">Стоимость крафта и ресурсы для всех орудий</p>
             </div>
-            <button class="profit-clear-btn" id="profit-clear">Очистить</button>
+            <div class="profit-calculator" id="profit-calculator">
+                <div class="profit-calculator-label">
+                    <span>💰</span> Сумма:
+                </div>
+                <div class="profit-calculator-value" id="profit-total">0 🪙</div>
+                <button class="profit-clear-btn" id="profit-clear">Очистить</button>
+            </div>
         </div>
 
         <div class="filters" style="margin-bottom:24px;">
@@ -589,7 +596,7 @@ function render() {
             }
 
             html += types.map(type => {
-                const items = byType[type];
+                const items = byType[type].filter(g => !favorites[g.name]);
                 if (!items.length) return '';
                 return `<div class="type-section">
                     <div class="type-header">${GUN_TYPE_ICONS[type]} ${type}</div>
