@@ -13,56 +13,65 @@
             background: var(--bg-card);
             border: 1px solid var(--border);
             border-radius: 12px;
-            padding: 16px 20px;
-            display: flex;
-            align-items: center;
-            gap: 16px;
-            transition: all 0.2s;
+            padding: 0;
+            display: grid;
+            grid-template-columns: 60px 1fr;
+            grid-template-rows: auto auto;
+            transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+            overflow: hidden;
         }
 
         .gun-card:hover {
             border-color: var(--accent);
             background: var(--bg-hover);
-            transform: translateY(-1px);
         }
 
         .gun-icon {
-            width: 44px;
-            height: 44px;
-            border-radius: 8px;
+            width: 60px;
+            height: 60px;
             background: linear-gradient(135deg, var(--bg-dark), rgba(30, 111, 168, 0.2));
-            border: 1px solid var(--border);
+            border: none;
+            border-right: 1px solid var(--border);
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 20px;
-            flex-shrink: 0;
+            font-size: 24px;
+            grid-row: 1;
+        }
+
+        .gun-icon img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
         }
 
         .gun-info {
             flex: 1;
             min-width: 0;
+            padding: 12px 16px;
+        }
+
+        .gun-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 8px;
+            margin-bottom: 8px;
         }
 
         .gun-name {
-            font-size: 15px;
+            font-size: 14px;
             font-weight: 600;
             color: #e8f4ff;
-            margin-bottom: 5px;
         }
 
-        .gun-type-badge {
-            display: inline-flex;
-            align-items: center;
+        .gun-prices {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
             gap: 4px;
-            padding: 2px 8px;
-            border-radius: 5px;
-            font-size: 11px;
-            font-weight: 600;
-            background: rgba(42, 159, 214, 0.12);
-            color: var(--accent2);
-            border: 1px solid rgba(42, 159, 214, 0.2);
-            margin-bottom: 8px;
+            flex-shrink: 0;
         }
 
         .gun-cost {
@@ -70,8 +79,6 @@
             color: var(--gold-light);
             font-weight: 700;
             white-space: nowrap;
-            flex-shrink: 0;
-            text-align: right;
         }
 
         .gun-cost-label {
@@ -79,6 +86,34 @@
             color: var(--text-muted);
             font-weight: 400;
             display: block;
+        }
+
+        .market-price {
+            font-size: 13px;
+            color: #4ade80;
+            font-weight: 700;
+        }
+
+        .res-title {
+            font-size: 10px;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+        }
+
+        .res-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+        }
+
+        .gun-footer {
+            grid-column: 1 / -1;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 12px;
+            background: rgba(0,0,0,0.2);
+            border-top: 1px solid var(--border);
         }
 
         .type-section {
@@ -128,17 +163,54 @@
             gap: 8px;
         }
 
-        .price-range input[type="range"] {
-            width: 120px;
-            accent-color: var(--accent);
+        .price-range input[type="number"] {
+            width: 80px;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--gold-light);
+            font-size: 13px;
+            font-weight: 700;
+            padding: 4px 8px;
+            text-align: center;
+        }
+
+        .price-range input[type="number"]:focus {
+            outline: none;
+            border-color: var(--accent);
         }
 
         .price-value {
-            min-width: 70px;
-            text-align: right;
             color: var(--gold-light);
             font-weight: 700;
             font-size: 13px;
+        }
+
+        .sort-buttons {
+            display: flex;
+            gap: 4px;
+        }
+
+        .sort-btn {
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .sort-btn:hover {
+            background: rgba(255,255,255,0.1);
+            color: #e8f4ff;
+        }
+
+        .sort-btn.active {
+            background: rgba(42, 159, 214, 0.2);
+            border-color: var(--accent2);
+            color: var(--accent2);
         }
 
         .favorites-panel {
@@ -231,12 +303,9 @@
         }
 
         .favorite-btn {
-            position: absolute;
-            top: 8px;
-            right: 8px;
-            width: 26px;
-            height: 26px;
-            border-radius: 50%;
+            width: 28px;
+            height: 28px;
+            border-radius: 6px;
             background: rgba(0,0,0,0.3);
             border: 1px solid var(--border);
             color: var(--text-muted);
@@ -244,9 +313,8 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 13px;
+            font-size: 14px;
             transition: all 0.2s;
-            z-index: 2;
         }
 
         .favorite-btn:hover {
@@ -262,40 +330,35 @@
         }
 
         .quantity-control {
-            position: absolute;
-            bottom: 8px;
-            right: 8px;
             display: flex;
             align-items: center;
             gap: 4px;
-            background: rgba(0,0,0,0.4);
+            background: rgba(255,255,255,0.05);
             border: 1px solid var(--border);
-            border-radius: 20px;
-            padding: 2px 6px;
-            z-index: 2;
+            border-radius: 6px;
+            padding: 2px;
         }
 
         .quantity-control input {
-            width: 40px;
+            width: 36px;
             background: rgba(255,255,255,0.05);
             border: none;
             color: var(--gold-light);
             text-align: center;
-            font-size: 13px;
+            font-size: 12px;
             font-weight: 700;
-            border-radius: 4px;
             padding: 2px;
         }
 
         .quantity-control input:focus {
-            outline: 1px solid var(--accent);
+            outline: none;
             background: rgba(255,255,255,0.1);
         }
 
         .quantity-control button {
             width: 22px;
             height: 22px;
-            border-radius: 50%;
+            border-radius: 4px;
             background: rgba(255,255,255,0.1);
             border: none;
             color: #e8f4ff;
@@ -311,28 +374,12 @@
             background: var(--accent);
         }
 
-        .quantity-control .qty-display {
-            font-size: 11px;
-            color: var(--gold);
-            min-width: 24px;
-            text-align: center;
-        }
-
         .total-sum {
-            position: absolute;
-            top: 8px;
-            left: 8px;
-            background: var(--accent);
-            color: var(--bg-dark);
-            font-size: 11px;
-            font-weight: 800;
-            padding: 2px 8px;
-            border-radius: 10px;
-            display: none;
-        }
-
-        .total-sum.visible {
-            display: block;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 12px;
+            font-weight: 700;
         }
 
         .total-sum span {
@@ -384,10 +431,16 @@
                 <div class="btn-group" id="type-filters"></div>
             </div>
             <div class="filter-group">
-                <div class="filter-label">💰 Цена на бирже</div>
+                <div class="filter-label">💰 Цена ≥</div>
                 <div class="price-range">
-                    <input type="range" id="price-filter" min="0" max="50000" value="50000">
-                    <span class="price-value" id="price-value">≤ 50 000</span>
+                    <input type="number" id="price-filter" placeholder="0" min="0" value="">
+                </div>
+            </div>
+            <div class="filter-group">
+                <div class="filter-label">↕ Сортировка</div>
+                <div class="sort-buttons">
+                    <button class="sort-btn" id="sort-desc" title="Сначала дорогие">↓ Дорогие</button>
+                    <button class="sort-btn" id="sort-asc" title="Сначала дешёвые">↑ Дешёвые</button>
                 </div>
             </div>
             <button class="btn-reset" id="btn-reset">↺ Сбросить</button>
@@ -421,7 +474,8 @@
         let ALL_GUNS = [];
         let activeType = null;
         let searchQuery = '';
-        let priceMax = 50000;
+        let priceMin = 0;
+        let sortOrder = null;
         let favorites = new Set(JSON.parse(localStorage.getItem('wosb_favorites') || '[]'));
         let quantities = JSON.parse(localStorage.getItem('wosb_quantities') || '{}');
 
@@ -457,12 +511,12 @@
             return ALL_GUNS.filter(g =>
                 (!activeType || g.type === activeType) &&
                 (!searchQuery || g.name.toLowerCase().includes(searchQuery)) &&
-                ((g.market_price || 0) <= priceMax)
+                ((g.market_price || 0) >= priceMin)
             );
         }
 
         function sortedGuns(guns) {
-            return [...guns].sort((a, b) => {
+            const sorted = [...guns].sort((a, b) => {
                 const aFav = favorites.has(a.name);
                 const bFav = favorites.has(b.name);
                 const aQty = quantities[a.name] || 1;
@@ -481,6 +535,14 @@
 
                 return 0;
             });
+
+            if (sortOrder === 'desc') {
+                sorted.sort((a, b) => (b.market_price || 0) - (a.market_price || 0));
+            } else if (sortOrder === 'asc') {
+                sorted.sort((a, b) => (a.market_price || 0) - (b.market_price || 0));
+            }
+
+            return sorted;
         }
 
         function renderFavoritesPanel() {
@@ -519,21 +581,20 @@
                         if (!r) return '';
                         return `<div class="res-item" title="${r.label}">
                             <span class="res-emoji">${r.emoji}</span>
-                            <span class="res-label">${r.label}</span>
                             <span class="res-value">${v.toLocaleString('ru-RU')}</span>
                         </div>`;
                     }).join('');
 
                     const craftCost = g.cost > 0
-                        ? `<div style="color:var(--gold-light);font-size:13px;font-weight:700">${g.cost.toLocaleString('ru-RU')} 🪙</div><div class="gun-cost-label">себестоимость крафта</div>`
-                        : `<div style="color:var(--text-muted);font-size:12px">— только биржа</div>`;
+                        ? `<div style="color:var(--gold-light);font-size:12px;font-weight:700">${g.cost.toLocaleString('ru-RU')} 🪙</div><div class="gun-cost-label">себестоимость</div>`
+                        : `<div style="color:var(--text-muted);font-size:11px">— только биржа</div>`;
 
                     const marketPrice = g.market_price
-                        ? `<div style="color:#4ade80;font-size:13px;font-weight:700">${Number(g.market_price).toLocaleString('ru-RU')} 🪙</div>`
-                        : `<div style="color:var(--text-muted);font-size:12px;font-style:italic">n/a</div>`;
+                        ? `<div style="color:#4ade80;font-size:12px;font-weight:700">${Number(g.market_price).toLocaleString('ru-RU')} 🪙</div>`
+                        : `<div style="color:var(--text-muted);font-size:11px;font-style:italic">n/a</div>`;
 
                     const iconHtml = g.img
-                        ? `<img src="resources/${g.img}" alt="${g.name}" style="width:40px;height:40px;object-fit:contain;border-radius:6px;">`
+                        ? `<img src="resources/${g.img}" alt="${g.name}">`
                         : GUN_TYPE_ICONS[g.type] || '💥';
 
                     const isFav = favorites.has(g.name);
@@ -543,34 +604,31 @@
 
                     const favBtn = `<button class="favorite-btn ${isFav ? 'active' : ''}" data-name="${g.name}" title="${isFav ? 'Убрать из избранного' : 'В избранное'}">${isFav ? '★' : '☆'}</button>`;
 
-                    const qtyCtrl = `<div class="quantity-control">
+                    const qtyCtrl = totalPrice > 0 ? `<div class="quantity-control">
                         <button class="qty-minus" data-name="${g.name}">−</button>
                         <input type="number" class="qty-input" data-name="${g.name}" value="${qty}" min="1">
                         <button class="qty-plus" data-name="${g.name}">+</button>
-                    </div>`;
-
-                    const totalBadge = totalPrice > 0 && qty > 1
-                        ? `<div class="total-sum visible">Σ <span>${totalPrice.toLocaleString('ru-RU')}</span> 🪙</div>`
-                        : `<div class="total-sum"></div>`;
+                        ${qty > 1 ? `<div class="total-sum">Σ <span>${totalPrice.toLocaleString('ru-RU')}</span></div>` : ''}
+                    </div>` : '';
 
                     return `<div class="gun-card ${isFav ? 'in-favorites' : ''}" data-name="${g.name}" data-price="${g.market_price || 0}">
-                        ${favBtn}
-                        ${totalBadge}
                         <div class="gun-icon">${iconHtml}</div>
                         <div class="gun-info">
-                          <div class="gun-name">${g.name}${g.qty > 1 ? ` <span style="color:var(--text-muted);font-size:12px">×${g.qty}</span>` : ''}</div>
-                          <div class="res-title" style="margin-top:8px">Ресурсы для крафта</div>
-                          <div class="res-grid">${res || '<span style="color:var(--text-muted);font-size:12px">нет ресурсов</span>'}</div>
+                            <div class="gun-header">
+                                <div class="gun-name">${g.name}${g.qty > 1 ? ` <span style="color:var(--text-muted);font-size:12px">×${g.qty}</span>` : ''}</div>
+                                <div class="gun-prices">
+                                    <div>${craftCost}</div>
+                                    <div style="margin-top:4px">${marketPrice}</div>
+                                </div>
+                            </div>
+                            <div class="res-title">Ресурсы для крафта</div>
+                            <div class="res-grid">${res || '<span style="color:var(--text-muted);font-size:11px">нет ресурсов</span>'}</div>
                         </div>
-                        <div class="gun-cost" style="display:flex;flex-direction:column;gap:10px;align-items:flex-end">
-                          <div>${craftCost}</div>
-                          <div style="text-align:right">
-                            <div class="gun-cost-label" style="margin-bottom:2px">цена на бирже</div>
-                            ${marketPrice}
-                          </div>
-                          ${qtyCtrl}
+                        <div class="gun-footer">
+                            ${favBtn}
+                            ${qtyCtrl}
                         </div>
-                      </div>`;
+                    </div>`;
                 }).join('');
 
                 return `<div class="type-section">
@@ -696,10 +754,24 @@
             });
 
             const priceInput = document.getElementById('price-filter');
-            const priceValue = document.getElementById('price-value');
             priceInput.addEventListener('input', () => {
-                priceMax = parseInt(priceInput.value);
-                priceValue.textContent = priceMax >= 50000 ? '∞' : `≤ ${priceMax.toLocaleString('ru-RU')}`;
+                priceMin = parseInt(priceInput.value) || 0;
+                render();
+                attachCardEvents();
+            });
+
+            document.getElementById('sort-desc').addEventListener('click', function() {
+                sortOrder = sortOrder === 'desc' ? null : 'desc';
+                document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
+                if (sortOrder) this.classList.add('active');
+                render();
+                attachCardEvents();
+            });
+
+            document.getElementById('sort-asc').addEventListener('click', function() {
+                sortOrder = sortOrder === 'asc' ? null : 'asc';
+                document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
+                if (sortOrder) this.classList.add('active');
                 render();
                 attachCardEvents();
             });
@@ -707,11 +779,11 @@
             document.getElementById('btn-reset').addEventListener('click', () => {
                 activeType = null;
                 searchQuery = '';
-                priceMax = 50000;
-                priceInput.value = 50000;
-                priceValue.textContent = '∞';
+                priceMin = 0;
+                sortOrder = null;
+                priceInput.value = '';
                 document.getElementById('search-input').value = '';
-                document.querySelectorAll('.btn-filter').forEach(b => b.classList.remove('active', 'active-type'));
+                document.querySelectorAll('.btn-filter, .sort-btn').forEach(b => b.classList.remove('active'));
                 render();
                 renderFavoritesPanel();
                 attachCardEvents();
