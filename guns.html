@@ -548,20 +548,8 @@ function render() {
                 </div>`;
             }).join('');
 
-            document.getElementById('guns-container').innerHTML = html;
+document.getElementById('guns-container').innerHTML = html;
             updateProfitTotal();
-        }
-
-            html += types.map(type => {
-                const items = byType[type];
-                if (!items.length) return '';
-                return `<div class="type-section">
-                    <div class="type-header">${GUN_TYPE_ICONS[type]} ${type}</div>
-                    <div style="display:grid;gap:8px;">${renderCards(items)}</div>
-                </div>`;
-            }).join('');
-
-            document.getElementById('guns-container').innerHTML = html;
         }
 
         function attachCardEvents() {
@@ -622,10 +610,21 @@ function render() {
             const cont = document.getElementById('guns-container');
             const srcEl = document.getElementById('src-indicator');
 
+            const fallbackTimeout = setTimeout(() => {
+                console.warn('Supabase запрос превысил таймаут, используем локальные данные');
+                ALL_GUNS = localGuns();
+                srcEl.innerHTML = '<span class="data-source local">🟡 Локальные данные</span>';
+                loader.style.display = 'none';
+                cont.style.display = 'block';
+                finishInit();
+            }, 8000);
+
             try {
                 ALL_GUNS = await loadGuns();
+                clearTimeout(fallbackTimeout);
                 srcEl.innerHTML = '<span class="data-source live">🟢 Supabase</span>';
             } catch (e) {
+                clearTimeout(fallbackTimeout);
                 console.warn('Supabase недоступен:', e);
                 ALL_GUNS = localGuns();
                 srcEl.innerHTML = '<span class="data-source local">🟡 Локальные данные</span>';
@@ -634,6 +633,10 @@ function render() {
             loader.style.display = 'none';
             cont.style.display = 'block';
 
+            finishInit();
+        }
+
+        function finishInit() {
             const types = ['Пушка', 'Кульверина', 'Карронада', 'Бомбарда', 'Мортира'];
             const typeContainer = document.getElementById('type-filters');
             types.forEach(t => {
