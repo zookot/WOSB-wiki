@@ -221,8 +221,8 @@
             margin-bottom: 20px;
             display: flex;
             align-items: center;
-            justify-content: space-between;
             gap: 16px;
+            flex-wrap: wrap;
         }
 
         .profit-calculator-label {
@@ -238,6 +238,7 @@
             font-size: 18px;
             font-weight: 700;
             color: var(--gold-light);
+            margin-left: auto;
         }
 
         .profit-clear-btn {
@@ -250,6 +251,7 @@
             color: #f87171;
             cursor: pointer;
             transition: all 0.2s;
+            flex-shrink: 0;
         }
 
         .profit-clear-btn:hover {
@@ -358,8 +360,8 @@
         <div class="profit-calculator" id="profit-calculator">
             <div class="profit-calculator-label">
                 <span>💰</span> Сумма выбранных орудий:
+                <div class="profit-calculator-value" id="profit-total">0 🪙</div>
             </div>
-            <div class="profit-calculator-value" id="profit-total">0 🪙</div>
             <button class="profit-clear-btn" id="profit-clear">Очистить</button>
         </div>
 
