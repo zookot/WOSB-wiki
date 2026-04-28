@@ -387,6 +387,10 @@
                     <button class="sort-btn" id="sort-asc" title="Сначала дешёвые">↑ Дешёвые</button>
                 </div>
             </div>
+            <div class="filter-group">
+                <div class="filter-label">★ Избранное</div>
+                <button class="sort-btn" id="fav-filter">★ Только избранные</button>
+            </div>
             <button class="btn-reset" id="btn-reset">↺ Сбросить</button>
         </div>
 
@@ -412,10 +416,21 @@
         let searchQuery = '';
         let priceMin = 0;
         let sortOrder = null;
+        let showFavoritesOnly = false;
         let quantities = JSON.parse(localStorage.getItem('wosb_gun_quantities') || '{}');
+        let favorites = JSON.parse(localStorage.getItem('wosb_gun_favorites') || '{}');
 
         function saveQuantities() {
             localStorage.setItem('wosb_gun_quantities', JSON.stringify(quantities));
+        }
+
+        function saveFavorites() {
+            localStorage.setItem('wosb_gun_favorites', JSON.stringify(favorites));
+        }
+
+        function toggleFavorite(name) {
+            favorites[name] = !favorites[name];
+            saveFavorites();
         }
 
         function updateProfitTotal() {
@@ -462,18 +477,26 @@
             return ALL_GUNS.filter(g =>
                 (!activeType || g.type === activeType) &&
                 (!searchQuery || g.name.toLowerCase().includes(searchQuery)) &&
-                ((g.market_price || 0) >= priceMin)
+                ((g.market_price || 0) >= priceMin) &&
+                (!showFavoritesOnly || favorites[g.name])
             );
         }
 
         function sortedGuns(guns) {
             const sorted = [...guns];
 
-            if (sortOrder === 'desc') {
-                sorted.sort((a, b) => (b.market_price || 0) - (a.market_price || 0));
-            } else if (sortOrder === 'asc') {
-                sorted.sort((a, b) => (a.market_price || 0) - (b.market_price || 0));
-            }
+            sorted.sort((a, b) => {
+                const aFav = favorites[a.name] ? 1 : 0;
+                const bFav = favorites[b.name] ? 1 : 0;
+                if (aFav !== bFav) return bFav - aFav;
+
+                if (sortOrder === 'desc') {
+                    return (b.market_price || 0) - (a.market_price || 0);
+                } else if (sortOrder === 'asc') {
+                    return (a.market_price || 0) - (b.market_price || 0);
+                }
+                return 0;
+            });
 
             return sorted;
         }
@@ -520,11 +543,17 @@ function render() {
                     ${qty > 0 ? `<div class="total-sum">Σ <span>${totalPrice.toLocaleString('ru-RU')}</span></div>` : ''}
                 </div>` : '';
 
+                const isFav = favorites[g.name];
+                const favBtn = `<button class="fav-btn" data-name="${g.name}" style="background:none;border:none;cursor:pointer;font-size:16px;padding:2px 6px;">${isFav ? '★' : '☆'}</button>`;
+
                 return `<div class="gun-card" data-name="${g.name}" data-price="${g.market_price || 0}">
                     <div class="gun-icon">${iconHtml}</div>
                     <div class="gun-info">
                         <div class="gun-header">
-                            <div class="gun-name">${g.name}${g.qty > 1 ? ` <span style="color:var(--text-muted);font-size:12px">×${g.qty}</span>` : ''}</div>
+                            <div style="display:flex;align-items:center;gap:6px;">
+                                ${favBtn}
+                                <div class="gun-name">${g.name}${g.qty > 1 ? ` <span style="color:var(--text-muted);font-size:12px">×${g.qty}</span>` : ''}</div>
+                            </div>
                             <div class="gun-prices">
                                 <div>${craftCost}</div>
                                 <div style="margin-top:4px">${marketPrice}</div>
@@ -589,6 +618,16 @@ document.getElementById('guns-container').innerHTML = html;
                     quantities[name] = Math.max(0, value);
                     saveQuantities();
                     animateLift(name);
+                    render();
+                    attachCardEvents();
+                });
+            });
+
+            document.querySelectorAll('.fav-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const name = btn.dataset.name;
+                    toggleFavorite(name);
                     render();
                     attachCardEvents();
                 });
@@ -676,13 +715,22 @@ document.getElementById('guns-container').innerHTML = html;
                 attachCardEvents();
             });
 
+            document.getElementById('fav-filter').addEventListener('click', function() {
+                showFavoritesOnly = !showFavoritesOnly;
+                this.classList.toggle('active', showFavoritesOnly);
+                render();
+                attachCardEvents();
+            });
+
             document.getElementById('btn-reset').addEventListener('click', () => {
                 activeType = null;
                 searchQuery = '';
                 priceMin = 0;
                 sortOrder = null;
+                showFavoritesOnly = false;
                 priceInput.value = '';
                 document.getElementById('search-input').value = '';
+                document.getElementById('fav-filter').classList.remove('active');
                 document.querySelectorAll('.btn-filter, .sort-btn').forEach(b => b.classList.remove('active'));
                 render();
                 attachCardEvents();
