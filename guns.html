@@ -386,12 +386,16 @@
             color: var(--gold);
         }
 
-        .favorites-section .gun-card {
-            border-color: rgba(74, 222, 128, 0.3);
+        .favorites-section {
+            margin-bottom: 24px;
         }
 
-        .qty-section .gun-card {
-            border-color: rgba(201, 162, 39, 0.3);
+        .favorites-section .type-header {
+            color: #4ade80;
+        }
+
+        .favorites-section .gun-card {
+            border-color: rgba(74, 222, 128, 0.3);
         }
 
         @keyframes spin {
@@ -568,74 +572,86 @@
             document.getElementById('gun-count').textContent = guns.length;
 
             const types = ['Пушка', 'Кульверина', 'Карронада', 'Бомбарда', 'Мортира'];
+
+            const favGuns = guns.filter(g => favorites.has(g.name));
             const byType = {};
             types.forEach(t => byType[t] = guns.filter(g => g.type === t));
 
-            document.getElementById('guns-container').innerHTML = types.map(type => {
-                const items = byType[type];
-                if (!items.length) return '';
-
-                const cards = items.map(g => {
-                    const res = Object.entries(g.res).map(([k, v]) => {
-                        const r = GUN_RES_LABELS[k];
-                        if (!r) return '';
-                        return `<div class="res-item" title="${r.label}">
-                            <span class="res-emoji">${r.emoji}</span>
-                            <span class="res-value">${v.toLocaleString('ru-RU')}</span>
-                        </div>`;
-                    }).join('');
-
-                    const craftCost = g.cost > 0
-                        ? `<div style="color:var(--gold-light);font-size:12px;font-weight:700">${g.cost.toLocaleString('ru-RU')} 🪙</div><div class="gun-cost-label">себестоимость</div>`
-                        : `<div style="color:var(--text-muted);font-size:11px">— только биржа</div>`;
-
-                    const marketPrice = g.market_price
-                        ? `<div style="color:#4ade80;font-size:12px;font-weight:700">${Number(g.market_price).toLocaleString('ru-RU')} 🪙</div>`
-                        : `<div style="color:var(--text-muted);font-size:11px;font-style:italic">n/a</div>`;
-
-                    const iconHtml = g.img
-                        ? `<img src="resources/${g.img}" alt="${g.name}">`
-                        : GUN_TYPE_ICONS[g.type] || '💥';
-
-                    const isFav = favorites.has(g.name);
-                    const qty = quantities[g.name] || 1;
-                    const unitPrice = g.market_price || 0;
-                    const totalPrice = unitPrice * qty;
-
-                    const favBtn = `<button class="favorite-btn ${isFav ? 'active' : ''}" data-name="${g.name}" title="${isFav ? 'Убрать из избранного' : 'В избранное'}">${isFav ? '★' : '☆'}</button>`;
-
-                    const qtyCtrl = totalPrice > 0 ? `<div class="quantity-control">
-                        <button class="qty-minus" data-name="${g.name}">−</button>
-                        <input type="number" class="qty-input" data-name="${g.name}" value="${qty}" min="1">
-                        <button class="qty-plus" data-name="${g.name}">+</button>
-                        ${qty > 1 ? `<div class="total-sum">Σ <span>${totalPrice.toLocaleString('ru-RU')}</span></div>` : ''}
-                    </div>` : '';
-
-                    return `<div class="gun-card ${isFav ? 'in-favorites' : ''}" data-name="${g.name}" data-price="${g.market_price || 0}">
-                        <div class="gun-icon">${iconHtml}</div>
-                        <div class="gun-info">
-                            <div class="gun-header">
-                                <div class="gun-name">${g.name}${g.qty > 1 ? ` <span style="color:var(--text-muted);font-size:12px">×${g.qty}</span>` : ''}</div>
-                                <div class="gun-prices">
-                                    <div>${craftCost}</div>
-                                    <div style="margin-top:4px">${marketPrice}</div>
-                                </div>
-                            </div>
-                            <div class="res-title">Ресурсы для крафта</div>
-                            <div class="res-grid">${res || '<span style="color:var(--text-muted);font-size:11px">нет ресурсов</span>'}</div>
-                        </div>
-                        <div class="gun-footer">
-                            ${favBtn}
-                            ${qtyCtrl}
-                        </div>
+            const renderCards = (items) => items.map(g => {
+                const res = Object.entries(g.res).map(([k, v]) => {
+                    const r = GUN_RES_LABELS[k];
+                    if (!r) return '';
+                    return `<div class="res-item" title="${r.label}">
+                        <span class="res-emoji">${r.emoji}</span>
+                        <span class="res-value">${v.toLocaleString('ru-RU')}</span>
                     </div>`;
                 }).join('');
 
-                return `<div class="type-section">
-                    <div class="type-header">${GUN_TYPE_ICONS[type]} ${type}</div>
-                    <div style="display:grid;gap:8px;">${cards}</div>
+                const craftCost = g.cost > 0
+                    ? `<div style="color:var(--gold-light);font-size:12px;font-weight:700">${g.cost.toLocaleString('ru-RU')} 🪙</div><div class="gun-cost-label">себестоимость</div>`
+                    : `<div style="color:var(--text-muted);font-size:11px">— только биржа</div>`;
+
+                const marketPrice = g.market_price
+                    ? `<div style="color:#4ade80;font-size:12px;font-weight:700">${Number(g.market_price).toLocaleString('ru-RU')} 🪙</div>`
+                    : `<div style="color:var(--text-muted);font-size:11px;font-style:italic">n/a</div>`;
+
+                const iconHtml = g.img
+                    ? `<img src="resources/${g.img}" alt="${g.name}">`
+                    : GUN_TYPE_ICONS[g.type] || '💥';
+
+                const isFav = favorites.has(g.name);
+                const qty = quantities[g.name] || 1;
+                const unitPrice = g.market_price || 0;
+                const totalPrice = unitPrice * qty;
+
+                const favBtn = `<button class="favorite-btn ${isFav ? 'active' : ''}" data-name="${g.name}" title="${isFav ? 'Убрать из избранного' : 'В избранное'}">${isFav ? '★' : '☆'}</button>`;
+
+                const qtyCtrl = totalPrice > 0 ? `<div class="quantity-control">
+                    <button class="qty-minus" data-name="${g.name}">−</button>
+                    <input type="number" class="qty-input" data-name="${g.name}" value="${qty}" min="1">
+                    <button class="qty-plus" data-name="${g.name}">+</button>
+                    ${qty > 1 ? `<div class="total-sum">Σ <span>${totalPrice.toLocaleString('ru-RU')}</span></div>` : ''}
+                </div>` : '';
+
+                return `<div class="gun-card ${isFav ? 'in-favorites' : ''}" data-name="${g.name}" data-price="${g.market_price || 0}">
+                    <div class="gun-icon">${iconHtml}</div>
+                    <div class="gun-info">
+                        <div class="gun-header">
+                            <div class="gun-name">${g.name}${g.qty > 1 ? ` <span style="color:var(--text-muted);font-size:12px">×${g.qty}</span>` : ''}</div>
+                            <div class="gun-prices">
+                                <div>${craftCost}</div>
+                                <div style="margin-top:4px">${marketPrice}</div>
+                            </div>
+                        </div>
+                        <div class="res-title">Ресурсы для крафт��</div>
+                        <div class="res-grid">${res || '<span style="color:var(--text-muted);font-size:11px">нет ресурсов</span>'}</div>
+                    </div>
+                    <div class="gun-footer">
+                        ${favBtn}
+                        ${qtyCtrl}
+                    </div>
                 </div>`;
             }).join('');
+
+            let html = '';
+
+            if (favGuns.length > 0) {
+                html += `<div class="favorites-section">
+                    <div class="type-header">⭐ Избранные</div>
+                    <div style="display:grid;gap:8px;">${renderCards(favGuns)}</div>
+                </div>`;
+            }
+
+            html += types.map(type => {
+                const items = byType[type];
+                if (!items.length) return '';
+                return `<div class="type-section">
+                    <div class="type-header">${GUN_TYPE_ICONS[type]} ${type}</div>
+                    <div style="display:grid;gap:8px;">${renderCards(items)}</div>
+                </div>`;
+            }).join('');
+
+            document.getElementById('guns-container').innerHTML = html;
         }
 
         function attachCardEvents() {
