@@ -264,6 +264,16 @@
             transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
         }
 
+        .gun-card.favorited {
+            border-color: var(--gold);
+            background: linear-gradient(135deg, rgba(201, 162, 39, 0.15), rgba(201, 162, 39, 0.05));
+        }
+
+        .gun-card.favorited:hover {
+            border-color: var(--gold-light);
+            background: linear-gradient(135deg, rgba(201, 162, 39, 0.2), rgba(201, 162, 39, 0.1));
+        }
+
         .gun-card.lifted {
             animation: liftCard 0.5s ease-out;
         }
@@ -316,6 +326,21 @@
 
         .quantity-control button:hover {
             background: var(--accent);
+        }
+
+        .fav-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 18px;
+            color: var(--text-muted);
+            transition: all 0.2s;
+            padding: 2px 4px;
+        }
+
+        .fav-btn:hover {
+            color: var(--gold);
+            transform: scale(1.2);
         }
 
         .total-sum {
@@ -387,10 +412,6 @@
                     <button class="sort-btn" id="sort-asc" title="Сначала дешёвые">↑ Дешёвые</button>
                 </div>
             </div>
-            <div class="filter-group">
-                <div class="filter-label">★ Избранное</div>
-                <button class="sort-btn" id="fav-filter">★ Только избранные</button>
-            </div>
             <button class="btn-reset" id="btn-reset">↺ Сбросить</button>
         </div>
 
@@ -416,7 +437,6 @@
         let searchQuery = '';
         let priceMin = 0;
         let sortOrder = null;
-        let showFavoritesOnly = false;
         let quantities = JSON.parse(localStorage.getItem('wosb_gun_quantities') || '{}');
         let favorites = JSON.parse(localStorage.getItem('wosb_gun_favorites') || '{}');
 
@@ -477,26 +497,18 @@
             return ALL_GUNS.filter(g =>
                 (!activeType || g.type === activeType) &&
                 (!searchQuery || g.name.toLowerCase().includes(searchQuery)) &&
-                ((g.market_price || 0) >= priceMin) &&
-                (!showFavoritesOnly || favorites[g.name])
+                ((g.market_price || 0) >= priceMin)
             );
         }
 
         function sortedGuns(guns) {
             const sorted = [...guns];
 
-            sorted.sort((a, b) => {
-                const aFav = favorites[a.name] ? 1 : 0;
-                const bFav = favorites[b.name] ? 1 : 0;
-                if (aFav !== bFav) return bFav - aFav;
-
-                if (sortOrder === 'desc') {
-                    return (b.market_price || 0) - (a.market_price || 0);
-                } else if (sortOrder === 'asc') {
-                    return (a.market_price || 0) - (b.market_price || 0);
-                }
-                return 0;
-            });
+            if (sortOrder === 'desc') {
+                sorted.sort((a, b) => (b.market_price || 0) - (a.market_price || 0));
+            } else if (sortOrder === 'asc') {
+                sorted.sort((a, b) => (a.market_price || 0) - (b.market_price || 0));
+            }
 
             return sorted;
         }
@@ -507,6 +519,7 @@ function render() {
 
             const types = ['Пушка', 'Кульверина', 'Карронада', 'Бомбарда', 'Мортира'];
 
+            const favoritesList = guns.filter(g => favorites[g.name]);
             const byType = {};
             types.forEach(t => byType[t] = guns.filter(g => g.type === t));
 
@@ -544,16 +557,13 @@ function render() {
                 </div>` : '';
 
                 const isFav = favorites[g.name];
-                const favBtn = `<button class="fav-btn" data-name="${g.name}" style="background:none;border:none;cursor:pointer;font-size:16px;padding:2px 6px;">${isFav ? '★' : '☆'}</button>`;
+                const favBtn = `<button class="fav-btn" data-name="${g.name}" style="background:none;border:none;cursor:pointer;font-size:18px;color:${isFav ? 'var(--gold)' : 'var(--text-muted)'}">${isFav ? '★' : '☆'}</button>`;
 
-                return `<div class="gun-card" data-name="${g.name}" data-price="${g.market_price || 0}">
+                return `<div class="gun-card${isFav ? ' favorited' : ''}" data-name="${g.name}" data-price="${g.market_price || 0}">
                     <div class="gun-icon">${iconHtml}</div>
                     <div class="gun-info">
                         <div class="gun-header">
-                            <div style="display:flex;align-items:center;gap:6px;">
-                                ${favBtn}
-                                <div class="gun-name">${g.name}${g.qty > 1 ? ` <span style="color:var(--text-muted);font-size:12px">×${g.qty}</span>` : ''}</div>
-                            </div>
+                            <div class="gun-name">${g.name}${g.qty > 1 ? ` <span style="color:var(--text-muted);font-size:12px">×${g.qty}</span>` : ''}</div>
                             <div class="gun-prices">
                                 <div>${craftCost}</div>
                                 <div style="margin-top:4px">${marketPrice}</div>
@@ -563,12 +573,22 @@ function render() {
                         <div class="res-grid">${res || '<span style="color:var(--text-muted);font-size:11px">нет ресурсов</span>'}</div>
                     </div>
                     <div class="gun-footer">
-                        ${qtyCtrl}
+                        ${favBtn}
+                        <div style="margin-left:auto">${qtyCtrl}</div>
                     </div>
                 </div>`;
             }).join('');
 
-            let html = types.map(type => {
+            let html = '';
+            
+            if (favoritesList.length > 0) {
+                html += `<div class="type-section">
+                    <div class="type-header" style="color:var(--gold)">★ Избранное</div>
+                    <div style="display:grid;gap:8px;">${renderCards(favoritesList)}</div>
+                </div>`;
+            }
+
+            html += types.map(type => {
                 const items = byType[type];
                 if (!items.length) return '';
                 return `<div class="type-section">
@@ -577,7 +597,7 @@ function render() {
                 </div>`;
             }).join('');
 
-document.getElementById('guns-container').innerHTML = html;
+            document.getElementById('guns-container').innerHTML = html;
             updateProfitTotal();
         }
 
@@ -715,22 +735,13 @@ document.getElementById('guns-container').innerHTML = html;
                 attachCardEvents();
             });
 
-            document.getElementById('fav-filter').addEventListener('click', function() {
-                showFavoritesOnly = !showFavoritesOnly;
-                this.classList.toggle('active', showFavoritesOnly);
-                render();
-                attachCardEvents();
-            });
-
             document.getElementById('btn-reset').addEventListener('click', () => {
                 activeType = null;
                 searchQuery = '';
                 priceMin = 0;
                 sortOrder = null;
-                showFavoritesOnly = false;
                 priceInput.value = '';
                 document.getElementById('search-input').value = '';
-                document.getElementById('fav-filter').classList.remove('active');
                 document.querySelectorAll('.btn-filter, .sort-btn').forEach(b => b.classList.remove('active'));
                 render();
                 attachCardEvents();
