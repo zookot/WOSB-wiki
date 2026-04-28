@@ -213,74 +213,48 @@
             color: var(--accent2);
         }
 
-        .favorites-panel {
-            background: rgba(74, 222, 128, 0.06);
-            border: 1px solid rgba(74, 222, 128, 0.2);
+        .profit-calculator {
+            background: linear-gradient(135deg, rgba(74, 222, 128, 0.08), rgba(201, 162, 39, 0.08));
+            border: 1px solid rgba(74, 222, 128, 0.25);
             border-radius: 10px;
-            padding: 12px 16px;
-            margin-bottom: 16px;
-            display: none;
-        }
-
-        .favorites-panel.visible {
-            display: block;
-        }
-
-        .favorites-panel-header {
-            font-size: 12px;
-            font-weight: 700;
-            color: #4ade80;
-            margin-bottom: 10px;
+            padding: 12px 20px;
+            margin-bottom: 20px;
             display: flex;
             align-items: center;
             justify-content: space-between;
+            gap: 16px;
         }
 
-        .favorites-panel-header button {
-            background: none;
-            border: none;
-            color: var(--text-muted);
-            cursor: pointer;
-            font-size: 11px;
-            padding: 2px 6px;
-            border-radius: 4px;
-            transition: all 0.2s;
-        }
-
-        .favorites-panel-header button:hover {
-            color: #f87171;
-            background: rgba(248, 113, 113, 0.1);
-        }
-
-        .favorites-grid {
+        .profit-calculator-label {
+            font-size: 13px;
+            font-weight: 600;
+            color: #4ade80;
             display: flex;
-            flex-wrap: wrap;
+            align-items: center;
             gap: 8px;
         }
 
-        .fav-chip {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            padding: 4px 10px;
-            background: rgba(74, 222, 128, 0.15);
-            border: 1px solid rgba(74, 222, 128, 0.3);
-            border-radius: 20px;
+        .profit-calculator-value {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--gold-light);
+        }
+
+        .profit-clear-btn {
+            padding: 6px 14px;
+            border-radius: 6px;
             font-size: 12px;
-            color: #4ade80;
+            font-weight: 600;
+            background: rgba(248, 113, 113, 0.15);
+            border: 1px solid rgba(248, 113, 113, 0.35);
+            color: #f87171;
             cursor: pointer;
             transition: all 0.2s;
         }
 
-        .fav-chip:hover {
-            background: rgba(248, 113, 113, 0.2);
-            border-color: rgba(248, 113, 113, 0.5);
-            color: #f87171;
-        }
-
-        .fav-chip .remove {
-            font-size: 10px;
-            opacity: 0.7;
+        .profit-clear-btn:hover {
+            background: rgba(248, 113, 113, 0.25);
+            border-color: #f87171;
         }
 
         .gun-card {
@@ -295,38 +269,6 @@
         @keyframes liftCard {
             0% { transform: translateY(10px); opacity: 0.5; }
             100% { transform: translateY(0); opacity: 1; }
-        }
-
-        .gun-card.in-favorites {
-            border-color: rgba(74, 222, 128, 0.4);
-            background: rgba(74, 222, 128, 0.04);
-        }
-
-        .favorite-btn {
-            width: 28px;
-            height: 28px;
-            border-radius: 6px;
-            background: rgba(0,0,0,0.3);
-            border: 1px solid var(--border);
-            color: var(--text-muted);
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 14px;
-            transition: all 0.2s;
-        }
-
-        .favorite-btn:hover {
-            background: rgba(74, 222, 128, 0.2);
-            border-color: #4ade80;
-            color: #4ade80;
-        }
-
-        .favorite-btn.active {
-            background: rgba(74, 222, 128, 0.25);
-            border-color: #4ade80;
-            color: #4ade80;
         }
 
         .quantity-control {
@@ -386,18 +328,6 @@
             color: var(--gold);
         }
 
-        .favorites-section {
-            margin-bottom: 24px;
-        }
-
-        .favorites-section .type-header {
-            color: #4ade80;
-        }
-
-        .favorites-section .gun-card {
-            border-color: rgba(74, 222, 128, 0.3);
-        }
-
         @keyframes spin {
             to {
                 transform: rotate(360deg);
@@ -425,6 +355,14 @@
             <p class="page-subtitle">Стоимость крафта и ресурсы для всех орудий</p>
         </div>
 
+        <div class="profit-calculator" id="profit-calculator">
+            <div class="profit-calculator-label">
+                <span>💰</span> Сумма выбранных орудий:
+            </div>
+            <div class="profit-calculator-value" id="profit-total">0 🪙</div>
+            <button class="profit-clear-btn" id="profit-clear">Очистить</button>
+        </div>
+
         <div class="filters" style="margin-bottom:24px;">
             <div class="filter-group">
                 <div class="filter-label">🔍 Поиск</div>
@@ -450,14 +388,6 @@
             <button class="btn-reset" id="btn-reset">↺ Сбросить</button>
         </div>
 
-        <div class="favorites-panel" id="favorites-panel">
-            <div class="favorites-panel-header">
-                <span>⭐ Избранные орудия</span>
-                <button id="clear-favorites">Очистить всё</button>
-            </div>
-            <div class="favorites-grid" id="favorites-grid"></div>
-        </div>
-
         <div class="stats-bar">
             <div class="stat-chip">Найдено: <span id="gun-count">0</span> орудий</div>
             <div class="stat-chip" id="src-indicator"></div>
@@ -480,15 +410,30 @@
         let searchQuery = '';
         let priceMin = 0;
         let sortOrder = null;
-        let favorites = new Set(JSON.parse(localStorage.getItem('wosb_favorites') || '[]'));
-        let quantities = JSON.parse(localStorage.getItem('wosb_quantities') || '{}');
-
-        function saveFavorites() {
-            localStorage.setItem('wosb_favorites', JSON.stringify([...favorites]));
-        }
+        let quantities = JSON.parse(localStorage.getItem('wosb_gun_quantities') || '{}');
 
         function saveQuantities() {
-            localStorage.setItem('wosb_quantities', JSON.stringify(quantities));
+            localStorage.setItem('wosb_gun_quantities', JSON.stringify(quantities));
+        }
+
+        function updateProfitTotal() {
+            let total = 0;
+            ALL_GUNS.forEach(g => {
+                const qty = quantities[g.name] || 0;
+                const price = g.market_price || 0;
+                if (qty > 0 && price > 0) {
+                    total += price * qty;
+                }
+            });
+            document.getElementById('profit-total').textContent = total.toLocaleString('ru-RU') + ' 🪙';
+        }
+
+        function clearAllQuantities() {
+            quantities = {};
+            saveQuantities();
+            render();
+            attachCardEvents();
+            updateProfitTotal();
         }
 
         function dbToGun(row) {
@@ -520,25 +465,7 @@
         }
 
         function sortedGuns(guns) {
-            const sorted = [...guns].sort((a, b) => {
-                const aFav = favorites.has(a.name);
-                const bFav = favorites.has(b.name);
-                const aQty = quantities[a.name] || 1;
-                const bQty = quantities[b.name] || 1;
-
-                if (aFav && !bFav) return -1;
-                if (!aFav && bFav) return 1;
-
-                if (aFav && bFav) {
-                    if (aQty > 1 && bQty <= 1) return -1;
-                    if (bQty > 1 && aQty <= 1) return 1;
-                } else {
-                    if (aQty > 1 && bQty <= 1) return -1;
-                    if (bQty > 1 && aQty <= 1) return 1;
-                }
-
-                return 0;
-            });
+            const sorted = [...guns];
 
             if (sortOrder === 'desc') {
                 sorted.sort((a, b) => (b.market_price || 0) - (a.market_price || 0));
@@ -549,31 +476,12 @@
             return sorted;
         }
 
-        function renderFavoritesPanel() {
-            const panel = document.getElementById('favorites-panel');
-            const grid = document.getElementById('favorites-grid');
-
-            if (favorites.size === 0) {
-                panel.classList.remove('visible');
-                return;
-            }
-
-            panel.classList.add('visible');
-            grid.innerHTML = [...favorites].map(name => `
-                <span class="fav-chip" data-name="${name}">
-                    ${name}
-                    <span class="remove">×</span>
-                </span>
-            `).join('');
-        }
-
-        function render() {
+function render() {
             const guns = sortedGuns(filtered());
             document.getElementById('gun-count').textContent = guns.length;
 
             const types = ['Пушка', 'Кульверина', 'Карронада', 'Бомбарда', 'Мортира'];
 
-            const favGuns = guns.filter(g => favorites.has(g.name));
             const byType = {};
             types.forEach(t => byType[t] = guns.filter(g => g.type === t));
 
@@ -599,21 +507,18 @@
                     ? `<img src="resources/${g.img}" alt="${g.name}">`
                     : GUN_TYPE_ICONS[g.type] || '💥';
 
-                const isFav = favorites.has(g.name);
-                const qty = quantities[g.name] || 1;
+                const qty = quantities[g.name] || 0;
                 const unitPrice = g.market_price || 0;
                 const totalPrice = unitPrice * qty;
 
-                const favBtn = `<button class="favorite-btn ${isFav ? 'active' : ''}" data-name="${g.name}" title="${isFav ? 'Убрать из избранного' : 'В избранное'}">${isFav ? '★' : '☆'}</button>`;
-
-                const qtyCtrl = totalPrice > 0 ? `<div class="quantity-control">
+                const qtyCtrl = unitPrice > 0 ? `<div class="quantity-control">
                     <button class="qty-minus" data-name="${g.name}">−</button>
-                    <input type="number" class="qty-input" data-name="${g.name}" value="${qty}" min="1">
+                    <input type="number" class="qty-input" data-name="${g.name}" value="${qty}" min="0">
                     <button class="qty-plus" data-name="${g.name}">+</button>
-                    ${qty > 1 ? `<div class="total-sum">Σ <span>${totalPrice.toLocaleString('ru-RU')}</span></div>` : ''}
+                    ${qty > 0 ? `<div class="total-sum">Σ <span>${totalPrice.toLocaleString('ru-RU')}</span></div>` : ''}
                 </div>` : '';
 
-                return `<div class="gun-card ${isFav ? 'in-favorites' : ''}" data-name="${g.name}" data-price="${g.market_price || 0}">
+                return `<div class="gun-card" data-name="${g.name}" data-price="${g.market_price || 0}">
                     <div class="gun-icon">${iconHtml}</div>
                     <div class="gun-info">
                         <div class="gun-header">
@@ -623,24 +528,27 @@
                                 <div style="margin-top:4px">${marketPrice}</div>
                             </div>
                         </div>
-                        <div class="res-title">Ресурсы для крафт��</div>
+                        <div class="res-title">Ресурсы для крафт</div>
                         <div class="res-grid">${res || '<span style="color:var(--text-muted);font-size:11px">нет ресурсов</span>'}</div>
                     </div>
                     <div class="gun-footer">
-                        ${favBtn}
                         ${qtyCtrl}
                     </div>
                 </div>`;
             }).join('');
 
-            let html = '';
-
-            if (favGuns.length > 0) {
-                html += `<div class="favorites-section">
-                    <div class="type-header">⭐ Избранные</div>
-                    <div style="display:grid;gap:8px;">${renderCards(favGuns)}</div>
+            let html = types.map(type => {
+                const items = byType[type];
+                if (!items.length) return '';
+                return `<div class="type-section">
+                    <div class="type-header">${GUN_TYPE_ICONS[type]} ${type}</div>
+                    <div style="display:grid;gap:8px;">${renderCards(items)}</div>
                 </div>`;
-            }
+            }).join('');
+
+            document.getElementById('guns-container').innerHTML = html;
+            updateProfitTotal();
+        }
 
             html += types.map(type => {
                 const items = byType[type];
@@ -655,28 +563,12 @@
         }
 
         function attachCardEvents() {
-            document.querySelectorAll('.favorite-btn').forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    const name = btn.dataset.name;
-                    if (favorites.has(name)) {
-                        favorites.delete(name);
-                    } else {
-                        favorites.add(name);
-                    }
-                    saveFavorites();
-                    renderFavoritesPanel();
-                    render();
-                    attachCardEvents();
-                });
-            });
-
             document.querySelectorAll('.qty-minus').forEach(btn => {
                 btn.addEventListener('click', (e) => {
                     e.stopPropagation();
                     const name = btn.dataset.name;
-                    const current = quantities[name] || 1;
-                    if (current > 1) {
+                    const current = quantities[name] || 0;
+                    if (current > 0) {
                         quantities[name] = current - 1;
                         saveQuantities();
                         animateLift(name);
@@ -690,7 +582,7 @@
                 btn.addEventListener('click', (e) => {
                     e.stopPropagation();
                     const name = btn.dataset.name;
-                    const current = quantities[name] || 1;
+                    const current = quantities[name] || 0;
                     quantities[name] = current + 1;
                     saveQuantities();
                     animateLift(name);
@@ -703,23 +595,10 @@
                 input.addEventListener('change', (e) => {
                     e.stopPropagation();
                     const name = input.dataset.name;
-                    const value = parseInt(input.value) || 1;
-                    quantities[name] = Math.max(1, value);
+                    const value = parseInt(input.value) || 0;
+                    quantities[name] = Math.max(0, value);
                     saveQuantities();
                     animateLift(name);
-                    render();
-                    attachCardEvents();
-                });
-            });
-
-            document.querySelectorAll('.fav-chip').forEach(chip => {
-                chip.addEventListener('click', () => {
-                    const name = chip.dataset.name;
-                    favorites.delete(name);
-                    delete quantities[name];
-                    saveFavorites();
-                    saveQuantities();
-                    renderFavoritesPanel();
                     render();
                     attachCardEvents();
                 });
@@ -801,7 +680,6 @@
                 document.getElementById('search-input').value = '';
                 document.querySelectorAll('.btn-filter, .sort-btn').forEach(b => b.classList.remove('active'));
                 render();
-                renderFavoritesPanel();
                 attachCardEvents();
             });
 
@@ -811,17 +689,8 @@
                 attachCardEvents();
             });
 
-            document.getElementById('clear-favorites').addEventListener('click', () => {
-                favorites.clear();
-                quantities = {};
-                saveFavorites();
-                saveQuantities();
-                renderFavoritesPanel();
-                render();
-                attachCardEvents();
-            });
+            document.getElementById('profit-clear').addEventListener('click', clearAllQuantities);
 
-            renderFavoritesPanel();
             render();
             attachCardEvents();
         }
