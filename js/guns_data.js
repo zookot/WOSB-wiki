@@ -66,12 +66,12 @@ const GUN_TYPE_ICONS = {
 
 // Метки ресурсов
 const GUN_RES_LABELS = {
-  gold:         { label: 'Золото',          emoji: '💰' },
-  iron:         { label: 'Железо',          emoji: '⚙️' },
-  copper:       { label: 'Медь',            emoji: '🔶' },
-  bronze:       { label: 'Бронза',          emoji: '🥉' },
-  rum:          { label: 'Ром',             emoji: '🍺' },
-  volcanic:     { label: 'Вулканическая',   emoji: '🌋' },
-  pirate_token: { label: 'Пиратский жетон', emoji: '🏴‍☠️' },
-  battle_mark:  { label: 'Боевая марка',    emoji: '🎖️',},
+  gold:         { label: 'Золото',              emoji: '💰' },
+  iron:         { label: 'Железо',              emoji: '⚙️' },
+  copper:       { label: 'Медь',                emoji: '🔶' },
+  bronze:       { label: 'Бронза',              emoji: '🥉' },
+  rum:          { label: 'Ром',                 emoji: '🍺' },
+  volcanic:     { label: 'Вулканическое железо',emoji: '🌋' },
+  pirate_token: { label: 'Пиратский жетон',     emoji: '🏴‍☠️' },
+  battle_mark:  { label: 'Боевая марка',        emoji: '🎖️' },
 };
