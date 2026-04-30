@@ -73,4 +73,5 @@ const GUN_RES_LABELS = {
   rum:          { label: 'Ром',             emoji: '🍺' },
   volcanic:     { label: 'Вулканическая',   emoji: '🌋' },
   pirate_token: { label: 'Пиратский жетон', emoji: '🏴‍☠️' },
+  battle_mark:  { label: 'Боевая марка',    emoji: '🎖️',},
 };
