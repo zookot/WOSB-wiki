@@ -9,116 +9,409 @@
     <link rel="stylesheet" href="css/style.css">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        .craft-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-            gap: 14px;
-        }
-
+        /* ===== КАРТОЧКА ===== */
         .craft-card {
             background: var(--bg-card);
             border: 1px solid var(--border);
             border-radius: 12px;
-            padding: 18px;
-            transition: all 0.2s;
+            padding: 0;
+            display: grid;
+            grid-template-columns: 56px 1fr;
+            transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+            overflow: hidden;
+            cursor: pointer;
             position: relative;
         }
 
         .craft-card:hover {
             border-color: var(--accent);
             background: var(--bg-hover);
-            transform: translateY(-1px);
-            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
         }
 
-        .craft-header {
-            display: flex;
-            align-items: flex-start;
-            gap: 12px;
-            margin-bottom: 14px;
+        .craft-card.expanded {
+            border-color: var(--accent2);
+            box-shadow: 0 0 0 1px rgba(42,159,214,0.2), 0 4px 20px rgba(0,0,0,0.3);
+        }
+
+        .craft-card.expanded.favorited {
+            border-color: var(--gold);
+            box-shadow: 0 0 0 1px rgba(201,162,39,0.3), 0 4px 20px rgba(0,0,0,0.3);
+        }
+
+        .craft-card.favorited {
+            border-color: var(--gold);
+            background: linear-gradient(135deg, rgba(201,162,39,0.15), rgba(201,162,39,0.05));
+        }
+
+        .craft-card.favorited:hover {
+            border-color: var(--gold-light);
+            background: linear-gradient(135deg, rgba(201,162,39,0.2), rgba(201,162,39,0.1));
         }
 
         .craft-icon {
-            width: 42px;
-            height: 42px;
-            border-radius: 8px;
-            background: linear-gradient(135deg, var(--bg-dark), rgba(30, 111, 168, 0.2));
-            border: 1px solid var(--border);
+            width: 56px;
+            height: 56px;
+            background: linear-gradient(135deg, var(--bg-dark), rgba(30,111,168,0.2));
+            border-right: 1px solid var(--border);
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 18px;
-            flex-shrink: 0;
+            font-size: 22px;
+            grid-row: 1;
+        }
+
+        .craft-info {
+            padding: 9px 12px;
+            min-width: 0;
+        }
+
+        .craft-header-row {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 6px;
         }
 
         .craft-name {
-            font-size: 15px;
+            font-size: 13px;
             font-weight: 600;
             color: #e8f4ff;
-            margin-bottom: 4px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            flex-shrink: 1;
+            min-width: 0;
         }
 
-        .craft-meta {
+        .expand-chevron {
+            font-size: 10px;
+            color: var(--text-muted);
+            transition: transform 0.35s cubic-bezier(0.4,0,0.2,1);
+            flex-shrink: 0;
+        }
+
+        .craft-card.expanded .expand-chevron {
+            transform: rotate(180deg);
+            color: var(--accent2);
+        }
+
+        /* ===== БЛОК ЦЕН ===== */
+        .craft-prices-row {
             display: flex;
+            align-items: stretch;
+            flex-shrink: 0;
+            margin-left: auto;
+            background: rgba(0,0,0,0.22);
+            border-radius: 7px;
+            border: 1px solid var(--border);
+            overflow: hidden;
+        }
+
+        .price-cell {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 1px;
+            padding: 3px 9px;
+        }
+
+        .price-cell + .price-cell { border-left: 1px solid var(--border); }
+
+        .price-cell-label {
+            font-size: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            color: var(--text-muted);
+            font-weight: 600;
+            white-space: nowrap;
+            line-height: 1;
+        }
+
+        .price-cell-value {
+            font-size: 11px;
+            font-weight: 700;
+            white-space: nowrap;
+            line-height: 1.3;
+        }
+
+        .price-cell-value.cost    { color: var(--gold-light); }
+        .price-cell-value.saving  { color: #4ade80; }
+        .price-cell-value.na      { color: var(--text-muted); font-style: italic; font-size: 10px; }
+
+        /* ===== РЕСУРСЫ В ШАПКЕ ===== */
+        .craft-res-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+        }
+
+        /* ===== FOOTER КАРТОЧКИ ===== */
+        .craft-footer {
+            grid-column: 1 / -1;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 7px 11px;
+            background: rgba(0,0,0,0.2);
+            border-top: 1px solid var(--border);
+        }
+
+        .fav-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 17px;
+            color: var(--text-muted);
+            transition: all 0.2s;
+            padding: 2px 4px;
+        }
+
+        .fav-btn:hover { color: var(--gold); transform: scale(1.2); }
+
+        .quantity-control {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 2px;
+        }
+
+        .quantity-control input {
+            width: 34px;
+            background: rgba(255,255,255,0.05);
+            border: none;
+            color: var(--gold-light);
+            text-align: center;
+            font-size: 12px;
+            font-weight: 700;
+            padding: 2px;
+        }
+
+        .quantity-control input:focus { outline: none; background: rgba(255,255,255,0.1); }
+
+        .quantity-control button {
+            width: 22px;
+            height: 22px;
+            border-radius: 4px;
+            background: rgba(255,255,255,0.1);
+            border: none;
+            color: #e8f4ff;
+            cursor: pointer;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .quantity-control button:hover { background: var(--accent); }
+
+        .total-sum {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .total-sum span { color: var(--gold); }
+
+        /* ===== РАСКРЫТИЕ ===== */
+        .craft-expand {
+            grid-column: 1 / -1;
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.45s cubic-bezier(0.4,0,0.2,1), opacity 0.3s ease;
+            opacity: 0;
+        }
+
+        .craft-card.expanded .craft-expand {
+            max-height: 800px;
+            opacity: 1;
+        }
+
+        .craft-expand-inner {
+            border-top: 1px solid var(--border);
+            background: rgba(0,0,0,0.22);
+            padding: 14px 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        @media (min-width: 680px) {
+            .craft-expand-inner { flex-direction: row; align-items: flex-start; }
+            .expand-section { flex: 1; min-width: 0; }
+        }
+
+        .expand-section-title {
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            color: var(--accent2);
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
             gap: 6px;
+        }
+
+        .expand-table-wrap { overflow-x: auto; }
+
+        .expand-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+        }
+
+        .expand-table th {
+            color: var(--text-muted);
+            font-weight: 600;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            padding: 4px 8px;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+            white-space: nowrap;
+        }
+
+        .expand-table td {
+            padding: 5px 8px;
+            border-bottom: 1px solid rgba(255,255,255,0.04);
+            color: #c8d8e8;
+            white-space: nowrap;
+        }
+
+        .expand-table tfoot td {
+            border-top: 1px solid var(--border);
+            border-bottom: none;
+            padding-top: 8px;
+            color: var(--gold-light);
+            font-weight: 700;
+        }
+
+        .expand-table td.num {
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .share-bar-wrap { display: flex; align-items: center; gap: 5px; min-width: 70px; }
+
+        .share-bar-track {
+            flex: 1;
+            height: 4px;
+            background: rgba(255,255,255,0.08);
+            border-radius: 2px;
+            overflow: hidden;
+            min-width: 32px;
+        }
+
+        .share-bar {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent), var(--accent2));
+            border-radius: 2px;
+            transition: width 0.4s ease;
+        }
+
+        .share-pct { font-size: 10px; color: var(--text-muted); min-width: 26px; text-align: right; }
+
+        /* ===== ФИНАНСОВЫЙ БЛОК ===== */
+        .fin-grid { display: flex; flex-direction: column; gap: 5px; }
+
+        .fin-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            font-size: 12px;
+            padding: 5px 8px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 5px;
+            border: 1px solid rgba(255,255,255,0.04);
+        }
+
+        .fin-label { color: var(--text-muted); white-space: nowrap; }
+
+        .fin-value {
+            font-weight: 700;
+            color: var(--gold-light);
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .fin-value.saving { color: #4ade80; }
+
+        /* ===== КАЛЬКУЛЯТОР ===== */
+        .craft-calculator {
+            background: linear-gradient(135deg, rgba(74,222,128,0.08), rgba(201,162,39,0.08));
+            border: 1px solid rgba(74,222,128,0.25);
+            border-radius: 10px;
+            padding: 10px 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
             flex-wrap: wrap;
         }
 
-        .craft-cost-block {
-            position: absolute;
-            top: 14px;
-            right: 14px;
-            text-align: right;
+        .calc-label { font-size: 12px; font-weight: 600; color: #4ade80; }
+        .calc-value { font-size: 16px; font-weight: 700; color: var(--gold-light); }
+
+        .calc-clear-btn {
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            background: rgba(248,113,113,0.15);
+            border: 1px solid rgba(248,113,113,0.35);
+            color: #f87171;
+            cursor: pointer;
+            transition: all 0.2s;
         }
 
-        .craft-cost-base {
-            font-size: 12px;
+        .calc-clear-btn:hover { background: rgba(248,113,113,0.25); border-color: #f87171; }
+
+        /* ===== СЕКЦИИ ===== */
+        .type-section { margin-bottom: 28px; }
+
+        .type-header {
+            font-family: 'Cinzel', serif;
+            font-size: 16px;
             font-weight: 700;
-            color: var(--gold-light);
-            line-height: 1.2;
+            color: var(--accent2);
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
 
-        .craft-cost-label {
-            font-size: 10px;
-            color: var(--text-muted);
-            margin-top: 1px;
+        .type-header::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: var(--border);
         }
 
-        /* Слайдер скидки */
+        /* ===== СЛАЙДЕР СКИДКИ ===== */
         .discount-block {
             background: var(--bg-card);
             border: 1px solid var(--border);
             border-radius: 14px;
-            padding: 18px 24px;
-            margin-bottom: 24px;
+            padding: 16px 22px;
+            margin-bottom: 20px;
             display: flex;
             align-items: center;
             flex-wrap: wrap;
-            gap: 20px;
+            gap: 18px;
         }
 
-        .discount-block-title {
-            font-size: 13px;
-            font-weight: 600;
-            color: var(--text);
-            white-space: nowrap;
-        }
+        .discount-block-title { font-size: 13px; font-weight: 600; color: var(--text); white-space: nowrap; }
 
-        .discount-block-info {
-            font-size: 11px;
-            color: var(--text-muted);
-            display: flex;
-            flex-direction: column;
-            gap: 2px;
-        }
+        .discount-block-info { font-size: 11px; color: var(--text-muted); display: flex; flex-direction: column; gap: 2px; }
 
-        .discount-slider-wrap {
-            display: flex;
-            align-items: center;
-            gap: 14px;
-            flex: 1;
-            min-width: 220px;
-        }
+        .discount-slider-wrap { display: flex; align-items: center; gap: 14px; flex: 1; min-width: 200px; }
 
         input[type="range"] {
             -webkit-appearance: none;
@@ -133,39 +426,21 @@
 
         input[type="range"]::-webkit-slider-thumb {
             -webkit-appearance: none;
-            appearance: none;
-            width: 18px;
-            height: 18px;
+            width: 18px; height: 18px;
             border-radius: 50%;
             background: var(--accent2);
             border: 2px solid var(--bg-dark);
             cursor: pointer;
-            box-shadow: 0 0 8px rgba(42, 159, 214, 0.5);
+            box-shadow: 0 0 8px rgba(42,159,214,0.5);
             transition: transform 0.15s;
         }
 
-        input[type="range"]::-webkit-slider-thumb:hover {
-            transform: scale(1.2);
-        }
+        input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
 
-        .discount-value {
-            font-size: 22px;
-            font-weight: 800;
-            color: var(--gold);
-            min-width: 52px;
-            text-align: center;
-            transition: color 0.2s;
-        }
+        .discount-value { font-size: 22px; font-weight: 800; color: var(--gold); min-width: 52px; text-align: center; transition: color 0.2s; }
+        .discount-value.max { color: #f87171; }
 
-        .discount-value.max {
-            color: #f87171;
-        }
-
-        .discount-presets {
-            display: flex;
-            gap: 6px;
-            flex-wrap: wrap;
-        }
+        .discount-presets { display: flex; gap: 6px; flex-wrap: wrap; }
 
         .preset-btn {
             background: var(--bg-dark);
@@ -180,53 +455,34 @@
             font-family: 'Inter', sans-serif;
         }
 
-        .preset-btn:hover,
-        .preset-btn.active {
-            background: rgba(42, 159, 214, 0.12);
-            border-color: var(--accent2);
-            color: var(--accent2);
+        .preset-btn:hover, .preset-btn.active { background: rgba(42,159,214,0.12); border-color: var(--accent2); color: var(--accent2); }
+        .preset-btn.active { background: rgba(42,159,214,0.2); }
+
+        /* ===== СОРТИРОВКА ===== */
+        .sort-buttons { display: flex; gap: 4px; }
+
+        .sort-btn {
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all 0.2s;
         }
 
-        .preset-btn.active {
-            background: rgba(42, 159, 214, 0.2);
-        }
+        .sort-btn:hover { background: rgba(255,255,255,0.1); color: #e8f4ff; }
+        .sort-btn.active { background: rgba(42,159,214,0.2); border-color: var(--accent2); color: var(--accent2); }
 
-        .section-header {
-            font-family: 'Cinzel', serif;
-            font-size: 18px;
-            font-weight: 700;
-            color: var(--gold);
-            margin: 28px 0 14px;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
+        .data-source { font-size: 11px; padding: 3px 8px; border-radius: 5px; font-weight: 600; }
+        .data-source.live { background: rgba(74,222,128,0.1); color: #4ade80; border: 1px solid rgba(74,222,128,0.25); }
+        .data-source.local { background: rgba(201,162,39,0.1); color: var(--gold); border: 1px solid rgba(201,162,39,0.3); }
 
-        .section-header::after {
-            content: '';
-            flex: 1;
-            height: 1px;
-            background: linear-gradient(90deg, var(--gold)44, transparent);
-        }
+        @keyframes spin { to { transform: rotate(360deg); } }
 
-        .data-source {
-            font-size: 11px;
-            padding: 3px 8px;
-            border-radius: 5px;
-            font-weight: 600;
-        }
-
-        .data-source.live {
-            background: rgba(74, 222, 128, 0.1);
-            color: #4ade80;
-            border: 1px solid rgba(74, 222, 128, 0.25);
-        }
-
-        .data-source.local {
-            background: rgba(201, 162, 39, 0.1);
-            color: var(--gold);
-            border: 1px solid rgba(201, 162, 39, 0.3);
-        }
+        .craft-card.lifted { animation: liftCard 0.5s ease-out; }
+        @keyframes liftCard { 0% { transform: translateY(10px); opacity: 0.5; } 100% { transform: translateY(0); opacity: 1; } }
     </style>
 </head>
 
@@ -245,8 +501,16 @@
 
     <main>
         <div class="page-header">
-            <h1 class="page-title">🔨 Крафт</h1>
-            <p class="page-subtitle">Рецепты мастерских, переработки, расходных предметов и боеприпасов</p>
+            <div>
+                <h1 class="page-title">🔨 Крафт</h1>
+                <p class="page-subtitle">Рецепты мастерских, переработки, расходных предметов и боеприпасов</p>
+            </div>
+            <div class="craft-calculator" id="craft-calculator">
+                <div class="calc-label">🧮 Итого:</div>
+                <div class="calc-value" id="calc-total">0 🪙</div>
+                <div style="font-size:11px;color:var(--text-muted)" id="calc-discount-note"></div>
+                <button class="calc-clear-btn" id="calc-clear">Очистить</button>
+            </div>
         </div>
 
         <!-- Слайдер скидки -->
@@ -286,6 +550,13 @@
                 <div class="filter-label">📋 Категория</div>
                 <div class="btn-group" id="cat-filters"></div>
             </div>
+            <div class="filter-group">
+                <div class="filter-label">↕ Сортировка</div>
+                <div class="sort-buttons">
+                    <button class="sort-btn" id="sort-desc">↓ Дорогие</button>
+                    <button class="sort-btn" id="sort-asc">↑ Дешёвые</button>
+                </div>
+            </div>
             <button class="btn-reset" id="btn-reset">↺ Сбросить</button>
         </div>
 
@@ -304,288 +575,602 @@
         <div id="craft-container" style="display:none"></div>
     </main>
 
-    <style>
-        @keyframes spin {
-            to {
-                transform: rotate(360deg)
-            }
-        }
-    </style>
-    <script src="js/config.js"></script>
-    <script>
-        // ===== Ресурсные метки =====
-        const RES_LABELS_CRAFT = {
-            wood: { label: 'Дерево', emoji: '🪵' },
-            iron: { label: 'Железо', emoji: '⚙️' },
-            copper: { label: 'Медь', emoji: '🔶' },
-            coal: { label: 'Уголь', emoji: '⬛' },
-            cloth: { label: 'Ткань', emoji: '🧵' },
-            sail: { label: 'Парусина', emoji: '⛵' },
-            iron_ore: { label: 'Железная руда', emoji: '🪨' },
-            copper_ore: { label: 'Медная руда', emoji: '🟤' },
-            debris: { label: 'Обломки', emoji: '🗑️' },
-            animals: { label: 'Животные', emoji: '🐄' },
-            gold: { label: 'Золото', emoji: '💰' },
-            battle_mark: { label: 'Боевая марка', emoji: '⚔️' },
-            blueprint_frag: { label: 'Фрагмент чертежа', emoji: '📜' },
-            rum: { label: 'Ром', emoji: '🍺' },
-            supplies: { label: 'Припасы', emoji: '📦' },
-            fresh_meat: { label: 'Свежее мясо', emoji: '🥩' },
-            fish: { label: 'Рыба', emoji: '🐟' },
-            whale_oil: { label: 'Китовый жир', emoji: '🐋' },
-            voodoo_skull: { label: 'Череп Вуду', emoji: '💀' },
-            bronze: { label: 'Бронза', emoji: '🥉' },
-            plate_res: { label: 'Пластина', emoji: '🔘' },
-            tar: { label: 'Смола', emoji: '🫙' },
-        };
+<script src="js/config.js"></script>
+<script>
+// ===== КОНСТАНТЫ =====
+const RES_LABELS_CRAFT = {
+    wood:          { label: 'Дерево',           emoji: '🪵' },
+    iron:          { label: 'Железо',           emoji: '⚙️' },
+    copper:        { label: 'Медь',             emoji: '🔶' },
+    bronze:        { label: 'Бронза',           emoji: '🥉' },
+    coal:          { label: 'Уголь',            emoji: '⬛' },
+    tar:           { label: 'Смола',            emoji: '🫙' },
+    cloth:         { label: 'Ткань',            emoji: '🧵' },
+    sail:          { label: 'Парусина',         emoji: '⛵' },
+    plate_res:     { label: 'Пластина',         emoji: '🔘' },
+    iron_ore:      { label: 'Железная руда',    emoji: '🪨' },
+    copper_ore:    { label: 'Медная руда',      emoji: '🟤' },
+    debris:        { label: 'Обломки',          emoji: '🗑️' },
+    animals:       { label: 'Животные',         emoji: '🐄' },
+    gold:          { label: 'Золото',           emoji: '💰' },
+    battle_mark:   { label: 'Боевая марка',     emoji: '⚔️' },
+    blueprint_frag:{ label: 'Фрагмент чертежа', emoji: '📜' },
+    rum:           { label: 'Ром',              emoji: '🍺' },
+    supplies:      { label: 'Припасы',          emoji: '📦' },
+    fish:          { label: 'Рыба',             emoji: '🐟' },
+    fresh_meat:    { label: 'Свежее мясо',      emoji: '🥩' },
+    whale_oil:     { label: 'Китовый жир',      emoji: '🐋' },
+    voodoo_skull:  { label: 'Череп Вуду',       emoji: '💀' },
+};
 
-        const CAT_ICONS = {
-            'Мастерские': '🏭', 'Переработка': '♻️',
-            'Расходные предметы': '🎒', 'Разное': '📦'
-        };
-        const CATS_ORDER = ['Мастерские', 'Переработка', 'Расходные предметы', 'Разное'];
+// Маппинг колонки → название в таблице resources
+const RES_COL_TO_NAME = {
+    wood:          'Дерево',
+    iron:          'Железо',
+    copper:        'Медь',
+    bronze:        'Бронза',
+    coal:          'Уголь',
+    tar:           'Смола',
+    cloth:         'Ткань',
+    sail:          'Парусина',
+    plate_res:     'Пластина',
+    iron_ore:      'Железная руда',
+    copper_ore:    'Медная руда',
+    debris:        'Обломки',
+    animals:       'Животные',
+    gold:          'Золото',
+    battle_mark:   'Боевая марка',
+    rum:           'Ром',
+    supplies:      'Припасы',
+    fish:          'Рыба',
+    fresh_meat:    'Свежее мясо',
+    whale_oil:     'Китовый жир',
+};
 
-        // Иконки по имени
-        const ITEM_ICONS = {
-            'Балка': '🔩', 'Бронза': '🥉', 'Пластина': '🔘', 'Парусина': '⛵', 'Переборка': '🛡️',
-            'Железо': '⚙️', 'Медь': '🔶', 'Уголь': '⬛', 'Свежее мясо': '🥩', '50 Ткани + 1 Кожа': '🧵',
-            'Сундук': '📦', 'Имперский чертеж': '📋', 'Порцион': '🥘', 'Снасти': '🔗',
-            'Чугунные ядра': '⚫', 'Брандскугели': '🔴', 'Бомбы осколочные': '💥',
-            'Малые поджигающие бочки': '🛢️', 'Большие осколочные мины': '💣',
-            'Деревяные заплатки': '🪵', 'Железные заплатки': '⚙️', 'Бронзовые заплатки': '🥉',
-            'Заплатки из обломков': '🗑️', 'Деревянные ремонт-набор': '🪵', 'Железные ремонт-набор': '⚙️',
-            'Бронзовый ремонт-набор': '🥉', 'Походный рацион': '🎒', 'Малые добавочные паруса': '⛵',
-            'Большие добавочные паруса': '⛵', 'Малые пластины': '🔘', 'Большие пластины': '🔘',
-            'Дымовая бомба': '💨', 'Дымовая завеса': '💨', 'Подкуп': '💀',
-            'Черные двойной порох': '⬛', 'Красный двойной порох': '🔴', 'Белый двойной порох': '⬜',
-            'Ром-паёк': '🍺', 'Сытный паёк': '🍖', 'Фосфор': '🟡', 'Пороховой заряд': '💥',
-            'Крюк Посейдона': '🪝', 'Сигнальная ракета Синяя': '🔵',
-            'Сигнальная ракета Красная': '🔴', 'Сигнальная ракета Желтая': '🟡',
-            'Горн': '📯',
-        };
+const DB_RES_COLS = Object.keys(RES_LABELS_CRAFT);
 
-        // Колонки-ресурсы из БД
-        const DB_RES_COLS = ['gold', 'wood', 'iron', 'copper', 'bronze', 'coal', 'tar', 'cloth', 'sail',
-            'plate_res', 'iron_ore', 'copper_ore', 'debris', 'animals', 'blueprint_frag',
-            'rum', 'supplies', 'fish', 'fresh_meat', 'whale_oil', 'battle_mark', 'voodoo_skull'];
+const CAT_ICONS = {
+    'Мастерские': '🏭', 'Переработка': '♻️',
+    'Расходные предметы': '🎒', 'Разное': '📦'
+};
+const CATS_ORDER = ['Мастерские', 'Переработка', 'Расходные предметы', 'Разное'];
 
-        let ALL_ITEMS = [];   // [{cat, name, cost, discount, time, res:{...}}]
-        let activeCategory = null;
-        let searchQuery = '';
-        let discount = 0;
+const ITEM_ICONS = {
+    'Балка':'🔩','Бронза':'🥉','Пластина':'🔘','Парусина':'⛵','Переборка':'🛡️',
+    'Железо':'⚙️','Медь':'🔶','Уголь':'⬛','Свежее мясо':'🥩','50 Ткани + 1 Кожа':'🧵',
+    'Сундук':'📦','Имперский чертеж':'📋','Порцион':'🥘','Снасти':'🔗',
+    'Чугунные ядра':'⚫','Брандскугели':'🔴','Бомбы осколочные':'💥',
+    'Малые поджигающие бочки':'🛢️','Большие осколочные мины':'💣',
+    'Деревяные заплатки':'🪵','Железные заплатки':'⚙️','Бронзовые заплатки':'🥉',
+    'Заплатки из обломков':'🗑️','Деревянные ремонт-набор':'🪵','Железные ремонт-набор':'⚙️',
+    'Бронзовый ремонт-набор':'🥉','Походный рацион':'🎒','Малые добавочные паруса':'⛵',
+    'Большие добавочные паруса':'⛵','Малые пластины':'🔘','Большие пластины':'🔘',
+    'Дымовая бомба':'💨','Дымовая завеса':'💨','Подкуп':'💀',
+    'Черные двойной порох':'⬛','Красный двойной порох':'🔴','Белый двойной порох':'⬜',
+    'Ром-паёк':'🍺','Сытный паёк':'🍖','Фосфор':'🟡','Пороховой заряд':'💥',
+    'Крюк Посейдона':'🪝','Сигнальная ракета Синяя':'🔵',
+    'Сигнальная ракета Красная':'🔴','Сигнальная ракета Желтая':'🟡','Горн':'📯',
+};
 
-        // ===== Нормализация строки из БД =====
-        function dbRowToItem(row, catName) {
-            const res = {};
-            DB_RES_COLS.forEach(col => { if (row[col] > 0) res[col] = row[col]; });
-            return {
-                cat: catName,
-                name: row.name,
-                cost: row.craft_cost ?? 0,
-                hasDiscount: row.discount > 0,
-                time: row.craft_time ?? 0,
-                res,
-            };
-        }
+// ===== СОСТОЯНИЕ (in-memory, без localStorage) =====
+let ALL_ITEMS     = [];
+let ALL_RESOURCES = [];
+let quantities    = {};
+let favorites     = {};
+let expandedCards = new Set();
 
-        // ===== Загрузка из Supabase =====
-        async function loadFromSupabase() {
-            const { data: cats, error: catErr } = await db.from('craft_categories').select('id,name');
-            if (catErr) throw catErr;
+let activeCategory = null;
+let searchQuery    = '';
+let sortOrder      = null;
+let discount       = 0;
 
-            const { data: items, error: itemErr } = await db
-                .from('craft_items')
-                .select('*')
-                .order('id');
-            if (itemErr) throw itemErr;
+// ===== ЦЕНЫ РЕСУРСОВ =====
+function getUnitPrice(col) {
+    const resName = RES_COL_TO_NAME[col];
+    if (!resName) return 0;
+    const r = ALL_RESOURCES.find(x => x.name === resName);
+    if (!r) return 0;
+    return r.is_base ? Number(r.cost_avg) : Number(r.cost_calc);
+}
 
-            const catMap = {};
-            cats.forEach(c => { catMap[c.id] = c.name; });
+// ===== ТАБЛИЦА СЕБЕСТОИМОСТИ =====
+function buildExpandHTML(item, qty) {
+    const effectiveQty = Math.max(qty || 1, 1);
+    const craftEntries = Object.entries(item.res || {}).filter(([,v]) => v > 0);
 
-            return items.map(row => dbRowToItem(row, catMap[row.category_id] || 'Разное'));
-        }
-
-        // ===== Fallback локальные данные =====
-        const LOCAL_DATA = [
-            { cat: 'Мастерские', name: 'Балка', cost: 340, hasDiscount: true, time: 5, res: { wood: 100, iron: 5, copper: 4 } },
-            { cat: 'Мастерские', name: 'Бронза', cost: 608, hasDiscount: true, time: 6, res: { iron: 20, copper: 10, coal: 1 } },
-            { cat: 'Мастерские', name: 'Пластина', cost: 776, hasDiscount: true, time: 6, res: { iron: 30, coal: 15, cloth: 4 } },
-            { cat: 'Мастерские', name: 'Парусина', cost: 61, hasDiscount: true, time: 3, res: { coal: 1, cloth: 10 } },
-            { cat: 'Мастерские', name: 'Переборка', cost: 1289, hasDiscount: true, time: 5, res: { iron: 70, coal: 1 } },
-            { cat: 'Переработка', name: 'Железо', cost: 88, time: 1, res: { iron_ore: 10 } },
-            { cat: 'Переработка', name: 'Медь', cost: 24, time: 2, res: { copper_ore: 1 } },
-            { cat: 'Переработка', name: 'Уголь', cost: 8, time: 1, res: { debris: 2 } },
-            { cat: 'Переработка', name: 'Свежее мясо', cost: 12, time: 1, res: { animals: 1 } },
-            { cat: 'Переработка', name: '50 Ткани + 1 Кожа', cost: 120, time: 20, res: { animals: 10 } },
-            { cat: 'Разное', name: 'Сундук', cost: 500, time: 1, res: { gold: 500 } },
-            { cat: 'Разное', name: 'Имперский чертеж', cost: 2800000, time: 200, res: { gold: 100000, blueprint_frag: 100 } },
-            { cat: 'Разное', name: 'Порцион', cost: 71, time: 2, res: { rum: 1, supplies: 2, fresh_meat: 3 } },
-            { cat: 'Разное', name: 'Снасти', cost: 30.5, time: 1, res: { wood: 5, iron: 1 } },
-            { cat: 'Разное', name: 'Чугунные ядра', cost: 144, time: 1, res: { iron: 8 } },
-            { cat: 'Разное', name: 'Брандскугели', cost: 120, time: 1, res: { iron: 5, battle_mark: 2 } },
-            { cat: 'Разное', name: 'Бомбы осколочные', cost: 114, time: 1, res: { iron: 5, copper: 1 } },
-            { cat: 'Разное', name: 'Малые поджигающие бочки', cost: 400, time: 1, res: { wood: 100, whale_oil: 10 } },
-            { cat: 'Разное', name: 'Большие осколочные мины', cost: 4180, time: 1, res: { wood: 200, animals: 20 } },
-            { cat: 'Расходные предметы', name: 'Деревяные заплатки', cost: 25, res: { wood: 10 } },
-            { cat: 'Расходные предметы', name: 'Железные заплатки', cost: 540, res: { iron: 30 } },
-            { cat: 'Расходные предметы', name: 'Бронзовые заплатки', cost: 473.6, res: { bronze: 1 } },
-            { cat: 'Расходные предметы', name: 'Заплатки из обломков', cost: 600, res: { debris: 25, battle_mark: 1 } },
-            { cat: 'Расходные предметы', name: 'Деревянные ремонт-набор', cost: 50.6, res: { wood: 10, cloth: 8 } },
-            { cat: 'Расходные предметы', name: 'Железные ремонт-набор', cost: 492, res: { iron: 22, cloth: 30 } },
-            { cat: 'Расходные предметы', name: 'Бронзовый ремонт-набор', cost: 540.3, res: { bronze: 1, sail: 1 } },
-            { cat: 'Расходные предметы', name: 'Походный рацион', cost: 160, res: { gold: 100, rum: 10 } },
-            { cat: 'Расходные предметы', name: 'Малые добавочные паруса', cost: 40, res: { gold: 40 } },
-            { cat: 'Расходные предметы', name: 'Большие добавочные паруса', cost: 133.4, res: { sail: 2 } },
-            { cat: 'Расходные предметы', name: 'Малые пластины', cost: 540, res: { iron: 30 } },
-            { cat: 'Расходные предметы', name: 'Большие пластины', cost: 3217.2, res: { plate_res: 1, battle_mark: 5 } },
-            { cat: 'Расходные предметы', name: 'Дымовая бомба', cost: 5000, res: { battle_mark: 10 } },
-            { cat: 'Расходные предметы', name: 'Дымовая завеса', cost: 5720, res: { iron: 40, battle_mark: 10 } },
-            { cat: 'Расходные предметы', name: 'Подкуп', cost: 10000, res: { voodoo_skull: 1 } },
-            { cat: 'Расходные предметы', name: 'Черные двойной порох', cost: 60, res: { gold: 60 } },
-            { cat: 'Расходные предметы', name: 'Красный двойной порох', cost: 60, res: { gold: 60 } },
-            { cat: 'Расходные предметы', name: 'Белый двойной порох', cost: 60, res: { gold: 60 } },
-            { cat: 'Расходные предметы', name: 'Ром-паёк', cost: 120, res: { rum: 20 } },
-            { cat: 'Расходные предметы', name: 'Сытный паёк', cost: 400, res: { fish: 20, fresh_meat: 40 } },
-            { cat: 'Расходные предметы', name: 'Фосфор', cost: 2150, res: { gold: 150, battle_mark: 4 } },
-            { cat: 'Расходные предметы', name: 'Пороховой заряд', cost: 2150, res: { gold: 150, battle_mark: 4 } },
-            { cat: 'Расходные предметы', name: 'Крюк Посейдона', cost: 15000, res: { gold: 5000, voodoo_skull: 1 } },
-            { cat: 'Расходные предметы', name: 'Сигнальная ракета Синяя', cost: 130, res: { gold: 130 } },
-            { cat: 'Расходные предметы', name: 'Сигнальная ракета Красная', cost: 200, res: { gold: 200 } },
-            { cat: 'Расходные предметы', name: 'Сигнальная ракета Желтая', cost: 5000, res: { battle_mark: 10 } },
-            { cat: 'Расходные предметы', name: 'Горн', cost: 10000, res: { voodoo_skull: 1 } },
-        ];
-
-        // ===== Рендер =====
-        function fmt(n) { return Math.round(n).toLocaleString('ru-RU'); }
-
-        function filtered() {
-            return ALL_ITEMS.filter(item =>
-                (!activeCategory || item.cat === activeCategory) &&
-                (!searchQuery || item.name.toLowerCase().includes(searchQuery))
-            );
-        }
-
-        function render() {
-            const items = filtered();
-            document.getElementById('item-count').textContent = items.length;
-
-            // Экономия
-            const savEl = document.getElementById('total-saving');
-            if (discount > 0) {
-                const saving = items.filter(i => i.hasDiscount && i.cost)
-                    .reduce((s, i) => s + i.cost * (discount / 100), 0);
-                if (saving > 0) { savEl.style.display = 'block'; document.getElementById('saving-val').textContent = `−${fmt(saving)} 🪙`; }
-                else savEl.style.display = 'none';
-            } else savEl.style.display = 'none';
-
-            const byCat = {};
-            CATS_ORDER.forEach(c => byCat[c] = items.filter(i => i.cat === c));
-
-            document.getElementById('craft-container').innerHTML = CATS_ORDER.map(cat => {
-                const catItems = byCat[cat];
-                if (!catItems.length) return '';
-
-                const cards = catItems.map(item => {
-                    const icon = ITEM_ICONS[item.name] || '📦';
-                    const resList = Object.entries(item.res || {}).filter(([, v]) => v > 0).map(([k, v]) => {
-                        const r = RES_LABELS_CRAFT[k] || { label: k, emoji: '📦' };
-                        return `<div class="res-item" title="${r.label}"><span class="res-emoji">${r.emoji}</span><span class="res-label">${r.label}</span><span class="res-value">${v.toLocaleString('ru-RU')}</span></div>`;
-                    }).join('');
-
-                    const timeBadge = item.time > 0 ? `<span class="badge badge-type">⏱ ${item.time} мин</span>` : '';
-                    const discBadge = item.hasDiscount
-                        ? `<span class="badge" style="background:rgba(74,222,128,0.1);color:#4ade80;border:1px solid rgba(74,222,128,0.25)">🏷️ Скидка</span>`
-                        : '';
-
-                    let costHtml = '';
-                    if (item.cost) {
-                        const discounted = item.hasDiscount && discount > 0 ? item.cost * (1 - discount / 100) : null;
-                        costHtml = `<div class="craft-cost-block">
-          ${discounted !== null
-                                ? `<div class="craft-cost-base" style="text-decoration:line-through;opacity:.4;font-size:11px">${fmt(item.cost)} 🪙</div>
-               <div style="color:#4ade80;font-size:13px;font-weight:800">${fmt(discounted)} 🪙</div>
-               <div class="craft-cost-label">со скидкой ${discount}%</div>`
-                                : `<div class="craft-cost-base">${fmt(item.cost)} 🪙</div>
-               <div class="craft-cost-label">${item.hasDiscount ? '<span style="color:var(--gold-light)">✓ скидка</span>' : 'себестоимость'}</div>`}
+    if (!craftEntries.length) {
+        return `<div class="craft-expand-inner">
+            <div class="expand-section">
+                <div class="expand-section-title">📦 Ингредиенты</div>
+                <div style="font-size:12px;color:var(--text-muted)">Нет данных о ресурсах</div>
+            </div>
         </div>`;
-                    }
+    }
 
-                    return `<div class="craft-card">${costHtml}
-        <div class="craft-header">
-          <div class="craft-icon">${icon}</div>
-          <div><div class="craft-name">${item.name}</div><div class="craft-meta">${timeBadge}${discBadge}</div></div>
+    let totalCost = 0;
+    const rows = craftEntries.map(([col, amount]) => {
+        const unitPrice  = getUnitPrice(col);
+        const totalAmt   = amount * effectiveQty;
+        const totalPrice = totalAmt * unitPrice;
+        totalCost += totalPrice;
+        return { col, amount, totalAmt, unitPrice, totalPrice };
+    });
+    rows.forEach(r => r.share = totalCost > 0 ? r.totalPrice / totalCost * 100 : 0);
+
+    const tableRows = rows.map(r => {
+        const meta     = RES_LABELS_CRAFT[r.col] || { label: r.col, emoji: '📦' };
+        const barW     = Math.max(1, Math.round(r.share));
+        const unitStr  = r.unitPrice > 0 ? r.unitPrice.toLocaleString('ru-RU', {maximumFractionDigits:2}) + ' 🪙' : '—';
+        const totalStr = r.totalPrice > 0 ? Math.round(r.totalPrice).toLocaleString('ru-RU') + ' 🪙' : '—';
+        return `<tr>
+            <td>${meta.emoji} ${meta.label}</td>
+            <td class="num">${r.totalAmt.toLocaleString('ru-RU')}</td>
+            <td class="num">${unitStr}</td>
+            <td class="num">${totalStr}</td>
+            <td class="num">
+                <div class="share-bar-wrap">
+                    <div class="share-bar-track"><div class="share-bar" style="width:${barW}%"></div></div>
+                    <span class="share-pct">${Math.round(r.share)}%</span>
+                </div>
+            </td>
+        </tr>`;
+    }).join('');
+
+    const totalStr    = totalCost > 0 ? Math.round(totalCost).toLocaleString('ru-RU') + ' 🪙' : '—';
+    const titleSuffix = totalCost > 0 ? ` (${Math.round(totalCost).toLocaleString('ru-RU')} 🪙)` : '';
+
+    // Финансовый блок
+    const baseCost = item.cost || 0;
+    const discCost = item.hasDiscount && discount > 0 ? baseCost * (1 - discount/100) : null;
+    const saving   = discCost !== null ? baseCost - discCost : null;
+
+    const finHTML = `<div class="expand-section">
+        <div class="expand-section-title">💹 Финансовые показатели${effectiveQty > 1 ? ' (×' + effectiveQty + ' шт.)' : ''}</div>
+        <div class="fin-grid">
+            ${baseCost ? `<div class="fin-row">
+                <span class="fin-label">💰 Себестоимость</span>
+                <span class="fin-value">${fmt(baseCost * effectiveQty)} 🪙</span>
+            </div>` : ''}
+            ${discCost !== null ? `<div class="fin-row">
+                <span class="fin-label">🏷️ Со скидкой ${discount}%</span>
+                <span class="fin-value saving">${fmt(discCost * effectiveQty)} 🪙</span>
+            </div>` : ''}
+            ${saving !== null ? `<div class="fin-row">
+                <span class="fin-label">✂️ Экономия</span>
+                <span class="fin-value saving">−${fmt(saving * effectiveQty)} 🪙</span>
+            </div>` : ''}
+            ${totalCost > 0 ? `<div class="fin-row">
+                <span class="fin-label">📊 Цена ресурсов</span>
+                <span class="fin-value">${fmt(totalCost)} 🪙</span>
+            </div>` : ''}
         </div>
-        <div class="res-title">Ингредиенты</div>
-        <div class="res-grid">${resList || '<span style="color:var(--text-muted);font-size:12px">— нет данных —</span>'}</div>
-      </div>`;
-                }).join('');
+    </div>`;
 
-                return `<h2 class="section-header">${CAT_ICONS[cat]} ${cat}</h2><div class="craft-grid">${cards}</div>`;
-            }).join('');
+    return `<div class="craft-expand-inner">
+        <div class="expand-section">
+            <div class="expand-section-title">📊 Структура себестоимости${titleSuffix}</div>
+            <div class="expand-table-wrap">
+                <table class="expand-table">
+                    <thead>
+                        <tr>
+                            <th>Ресурс</th>
+                            <th>Кол-во</th>
+                            <th>Цена / ед.</th>
+                            <th>Итого</th>
+                            <th>Доля</th>
+                        </tr>
+                    </thead>
+                    <tbody>${tableRows}</tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="3">Итого</td>
+                            <td class="num">${totalStr}</td>
+                            <td></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+        ${finHTML}
+    </div>`;
+}
+
+// ===== КАЛЬКУЛЯТОР =====
+function updateCalcTotal() {
+    let total = 0;
+    ALL_ITEMS.forEach(item => {
+        const qty = quantities[item.name] || 0;
+        if (qty <= 0) return;
+        const cost = item.hasDiscount && discount > 0
+            ? item.cost * (1 - discount/100)
+            : item.cost;
+        total += cost * qty;
+    });
+    document.getElementById('calc-total').textContent = fmt(total) + ' 🪙';
+    const note = document.getElementById('calc-discount-note');
+    note.textContent = discount > 0 ? `с учётом скидки ${discount}%` : '';
+}
+
+// ===== РЕНДЕР =====
+function fmt(n) { return Math.round(n).toLocaleString('ru-RU'); }
+
+function filtered() {
+    let items = ALL_ITEMS.filter(item =>
+        (!activeCategory || item.cat === activeCategory) &&
+        (!searchQuery || item.name.toLowerCase().includes(searchQuery))
+    );
+    if (sortOrder === 'asc')  items = items.sort((a,b) => a.cost - b.cost);
+    if (sortOrder === 'desc') items = items.sort((a,b) => b.cost - a.cost);
+    return items;
+}
+
+function renderCard(item) {
+    const icon     = ITEM_ICONS[item.name] || '📦';
+    const qty      = quantities[item.name] || 0;
+    const isFav    = !!favorites[item.name];
+    const isExp    = expandedCards.has(item.name);
+    const expanded = isExp ? ' expanded' : '';
+    const favClass = isFav ? ' favorited' : '';
+
+    // Блок ресурсов в шапке
+    const resItems = Object.entries(item.res || {}).filter(([,v]) => v > 0).map(([k,v]) => {
+        const meta = RES_LABELS_CRAFT[k] || { label: k, emoji: '📦' };
+        return `<div class="res-item" title="${meta.label}"><span class="res-emoji">${meta.emoji}</span><span class="res-label">${meta.label}</span><span class="res-value">${v.toLocaleString('ru-RU')}</span></div>`;
+    }).join('');
+
+    // Блок цен
+    const baseCost  = item.cost;
+    const discCost  = item.hasDiscount && discount > 0 ? baseCost * (1 - discount/100) : null;
+    const timeBadge = item.time > 0 ? `<span class="badge badge-type">⏱ ${item.time} мин</span>` : '';
+    const discBadge = item.hasDiscount ? `<span class="badge" style="background:rgba(74,222,128,0.1);color:#4ade80;border:1px solid rgba(74,222,128,0.25)">🏷️ Скидка</span>` : '';
+
+    let pricesHTML = '';
+    if (baseCost) {
+        if (discCost !== null) {
+            pricesHTML = `<div class="craft-prices-row">
+                <div class="price-cell">
+                    <span class="price-cell-label">Себест.</span>
+                    <span class="price-cell-value cost" style="text-decoration:line-through;opacity:.45">${fmt(baseCost)} 🪙</span>
+                </div>
+                <div class="price-cell">
+                    <span class="price-cell-label">−${discount}%</span>
+                    <span class="price-cell-value saving">${fmt(discCost)} 🪙</span>
+                </div>
+            </div>`;
+        } else {
+            pricesHTML = `<div class="craft-prices-row">
+                <div class="price-cell">
+                    <span class="price-cell-label">Себест.</span>
+                    <span class="price-cell-value cost">${fmt(baseCost)} 🪙</span>
+                </div>
+            </div>`;
         }
+    }
 
-        // ===== Инициализация =====
-        async function init() {
-            const loader = document.getElementById('loader');
-            const cont = document.getElementById('craft-container');
-            const srcEl = document.getElementById('src-indicator');
+    // Footer: итог количества
+    const lineTotal = qty > 0
+        ? `<span class="total-sum">×${qty} = <span>${fmt((discCost ?? baseCost) * qty)} 🪙</span></span>`
+        : '<span style="font-size:11px;color:var(--text-muted)">Кол-во</span>';
 
-            try {
-                ALL_ITEMS = await loadFromSupabase();
-                srcEl.innerHTML = '<span class="data-source live">🟢 Supabase</span>';
-            } catch (e) {
-                console.warn('Supabase недоступен, используем локальные данные:', e);
-                ALL_ITEMS = LOCAL_DATA;
-                srcEl.innerHTML = '<span class="data-source local">🟡 Локальные данные</span>';
+    return `<div class="craft-card${expanded}${favClass}" data-name="${item.name.replace(/"/g,'&quot;')}">
+        <div class="craft-icon">${icon}</div>
+        <div class="craft-info">
+            <div class="craft-header-row">
+                <span class="craft-name">${item.name}</span>
+                <span class="expand-chevron">▼</span>
+                ${pricesHTML}
+            </div>
+            <div class="craft-res-row">${timeBadge}${discBadge}</div>
+            <div class="res-grid" style="margin-top:6px">${resItems || '<span style="color:var(--text-muted);font-size:11px">— нет данных —</span>'}</div>
+        </div>
+        <div class="craft-footer" onclick="event.stopPropagation()">
+            <button class="fav-btn" title="Избранное" onclick="toggleFav('${item.name.replace(/'/g,"\\'")}',event)">${isFav ? '★' : '☆'}</button>
+            <div class="quantity-control">
+                <button onclick="changeQty('${item.name.replace(/'/g,"\\'")}', -1, event)">−</button>
+                <input type="number" min="0" value="${qty}" onchange="setQty('${item.name.replace(/'/g,"\\'")}', this.value, event)" onclick="event.stopPropagation()">
+                <button onclick="changeQty('${item.name.replace(/'/g,"\\'")}', 1, event)">+</button>
+            </div>
+            ${lineTotal}
+        </div>
+        <div class="craft-expand">
+            ${isExp ? buildExpandHTML(item, Math.max(qty,1)) : ''}
+        </div>
+    </div>`;
+}
+
+function render() {
+    const items = filtered();
+    document.getElementById('item-count').textContent = items.length;
+
+    // Экономия
+    const savEl = document.getElementById('total-saving');
+    if (discount > 0) {
+        const saving = items.filter(i => i.hasDiscount && i.cost)
+            .reduce((s, i) => s + i.cost * (discount/100), 0);
+        if (saving > 0) {
+            savEl.style.display = 'block';
+            document.getElementById('saving-val').textContent = `−${fmt(saving)} 🪙`;
+        } else savEl.style.display = 'none';
+    } else savEl.style.display = 'none';
+
+    const byCat = {};
+    CATS_ORDER.forEach(c => byCat[c] = items.filter(i => i.cat === c));
+
+    document.getElementById('craft-container').innerHTML = CATS_ORDER.map(cat => {
+        const catItems = byCat[cat];
+        if (!catItems.length) return '';
+        return `<div class="type-section">
+            <div class="type-header">${CAT_ICONS[cat]} ${cat}</div>
+            <div style="display:flex;flex-direction:column;gap:8px">
+                ${catItems.map(renderCard).join('')}
+            </div>
+        </div>`;
+    }).join('');
+
+    // Навешиваем обработчики клика по карточке
+    document.querySelectorAll('.craft-card').forEach(card => {
+        card.addEventListener('click', () => toggleExpand(card.dataset.name));
+    });
+
+    updateCalcTotal();
+}
+
+// ===== EXPAND =====
+function toggleExpand(name) {
+    if (expandedCards.has(name)) {
+        expandedCards.delete(name);
+    } else {
+        expandedCards.add(name);
+    }
+    // Перерисовываем только карточку
+    const item = ALL_ITEMS.find(i => i.name === name);
+    if (!item) return;
+    const card = document.querySelector(`.craft-card[data-name="${name.replace(/"/g,'&quot;')}"]`);
+    if (!card) return;
+    const expandDiv = card.querySelector('.craft-expand');
+    if (expandedCards.has(name)) {
+        card.classList.add('expanded');
+        expandDiv.innerHTML = buildExpandHTML(item, Math.max(quantities[name] || 1, 1));
+    } else {
+        card.classList.remove('expanded');
+    }
+}
+
+// ===== ИЗБРАННОЕ =====
+function toggleFav(name, e) {
+    e && e.stopPropagation();
+    favorites[name] = !favorites[name];
+    render();
+}
+
+// ===== КОЛИЧЕСТВО =====
+function changeQty(name, delta, e) {
+    e && e.stopPropagation();
+    quantities[name] = Math.max(0, (quantities[name] || 0) + delta);
+    // Обновляем footer и expand без полного ре-рендера
+    refreshCardFooter(name);
+    updateCalcTotal();
+}
+
+function setQty(name, val, e) {
+    e && e.stopPropagation();
+    quantities[name] = Math.max(0, parseInt(val) || 0);
+    refreshCardFooter(name);
+    updateCalcTotal();
+}
+
+function refreshCardFooter(name) {
+    const item = ALL_ITEMS.find(i => i.name === name);
+    if (!item) return;
+    const card = document.querySelector(`.craft-card[data-name="${name.replace(/"/g,'&quot;')}"]`);
+    if (!card) return;
+
+    const qty     = quantities[name] || 0;
+    const discCost = item.hasDiscount && discount > 0 ? item.cost * (1 - discount/100) : null;
+
+    // Обновить input
+    const inp = card.querySelector('.quantity-control input');
+    if (inp) inp.value = qty;
+
+    // Обновить итог
+    const sumEl = card.querySelector('.total-sum');
+    const noEl  = card.querySelector('.craft-footer > span:last-child');
+    const footer = card.querySelector('.craft-footer');
+    if (footer) {
+        const lastEl = footer.lastElementChild;
+        if (qty > 0) {
+            const total = fmt((discCost ?? item.cost) * qty);
+            if (lastEl && lastEl.classList.contains('total-sum')) {
+                lastEl.innerHTML = `×${qty} = <span>${total} 🪙</span>`;
+            } else {
+                const span = document.createElement('span');
+                span.className = 'total-sum';
+                span.innerHTML = `×${qty} = <span>${total} 🪙</span>`;
+                if (lastEl) footer.replaceChild(span, lastEl);
+                else footer.appendChild(span);
             }
-
-            loader.style.display = 'none';
-            cont.style.display = 'block';
-
-            // Кнопки категорий
-            const catCont = document.getElementById('cat-filters');
-            CATS_ORDER.forEach(c => {
-                const btn = document.createElement('button');
-                btn.className = 'btn-filter';
-                btn.innerHTML = `${CAT_ICONS[c]} ${c}`;
-                btn.addEventListener('click', () => {
-                    activeCategory = activeCategory === c ? null : c;
-                    document.querySelectorAll('#cat-filters .btn-filter').forEach(b => b.classList.remove('active'));
-                    if (activeCategory) btn.classList.add('active');
-                    render();
-                });
-                catCont.appendChild(btn);
-            });
-
-            // Слайдер
-            function setDiscount(val) {
-                discount = parseInt(val);
-                document.getElementById('discount-slider').value = discount;
-                const disp = document.getElementById('discount-display');
-                disp.textContent = discount + '%';
-                disp.className = 'discount-value' + (discount === 35 ? ' max' : '');
-                document.querySelectorAll('.preset-btn').forEach(b =>
-                    b.classList.toggle('active', parseInt(b.dataset.val) === discount));
-                render();
+        } else {
+            if (lastEl && lastEl.classList.contains('total-sum')) {
+                const span = document.createElement('span');
+                span.style.cssText = 'font-size:11px;color:var(--text-muted)';
+                span.textContent = 'Кол-во';
+                footer.replaceChild(span, lastEl);
             }
-            document.getElementById('discount-slider').addEventListener('input', e => setDiscount(e.target.value));
-            document.querySelectorAll('.preset-btn').forEach(b => b.addEventListener('click', () => setDiscount(b.dataset.val)));
+        }
+    }
 
-            document.getElementById('btn-reset').addEventListener('click', () => {
-                activeCategory = null; searchQuery = '';
-                document.getElementById('search-input').value = '';
-                setDiscount(0);
-                document.querySelectorAll('#cat-filters .btn-filter').forEach(b => b.classList.remove('active'));
-            });
-            document.getElementById('search-input').addEventListener('input', function () {
-                searchQuery = this.value.toLowerCase().trim(); render();
-            });
+    // Обновить expand если открыт
+    if (expandedCards.has(name)) {
+        const expandDiv = card.querySelector('.craft-expand');
+        if (expandDiv) expandDiv.innerHTML = buildExpandHTML(item, Math.max(qty, 1));
+    }
+}
 
+// ===== СКИДКА =====
+function setDiscount(val) {
+    discount = parseInt(val);
+    document.getElementById('discount-slider').value = discount;
+    const disp = document.getElementById('discount-display');
+    disp.textContent = discount + '%';
+    disp.className = 'discount-value' + (discount === 35 ? ' max' : '');
+    document.querySelectorAll('.preset-btn').forEach(b =>
+        b.classList.toggle('active', parseInt(b.dataset.val) === discount));
+    render();
+}
+
+// ===== ДАННЫЕ =====
+function dbRowToItem(row, catName) {
+    const res = {};
+    DB_RES_COLS.forEach(col => { if (row[col] > 0) res[col] = row[col]; });
+    return {
+        cat:         catName,
+        name:        row.name,
+        cost:        row.craft_cost ?? 0,
+        hasDiscount: row.discount > 0,
+        time:        row.craft_time ?? 0,
+        res,
+    };
+}
+
+async function loadFromSupabase() {
+    const { data: cats,  error: catErr  } = await db.from('craft_categories').select('id,name');
+    if (catErr) throw catErr;
+    const { data: items, error: itemErr } = await db.from('craft_items').select('*').order('id');
+    if (itemErr) throw itemErr;
+    const { data: res,   error: resErr  } = await db.from('resources').select('*');
+    if (resErr) throw resErr;
+    ALL_RESOURCES = res || [];
+    const catMap = {};
+    cats.forEach(c => { catMap[c.id] = c.name; });
+    return items.map(row => dbRowToItem(row, catMap[row.category_id] || 'Разное'));
+}
+
+const LOCAL_DATA = [
+    { cat:'Мастерские',name:'Балка',cost:340,hasDiscount:true,time:5,res:{wood:100,iron:5,copper:4}},
+    { cat:'Мастерские',name:'Бронза',cost:608,hasDiscount:true,time:6,res:{iron:20,copper:10,coal:1}},
+    { cat:'Мастерские',name:'Пластина',cost:776,hasDiscount:true,time:6,res:{iron:30,coal:15,cloth:4}},
+    { cat:'Мастерские',name:'Парусина',cost:61,hasDiscount:true,time:3,res:{coal:1,cloth:10}},
+    { cat:'Мастерские',name:'Переборка',cost:1289,hasDiscount:true,time:5,res:{iron:70,coal:1}},
+    { cat:'Переработка',name:'Железо',cost:88,hasDiscount:false,time:1,res:{iron_ore:10}},
+    { cat:'Переработка',name:'Медь',cost:24,hasDiscount:false,time:2,res:{copper_ore:1}},
+    { cat:'Переработка',name:'Уголь',cost:8,hasDiscount:false,time:1,res:{debris:2}},
+    { cat:'Переработка',name:'Свежее мясо',cost:12,hasDiscount:false,time:1,res:{animals:1}},
+    { cat:'Переработка',name:'50 Ткани + 1 Кожа',cost:120,hasDiscount:false,time:20,res:{animals:10}},
+    { cat:'Разное',name:'Сундук',cost:500,hasDiscount:false,time:1,res:{gold:500}},
+    { cat:'Разное',name:'Имперский чертеж',cost:2800000,hasDiscount:false,time:200,res:{gold:100000,blueprint_frag:100}},
+    { cat:'Разное',name:'Порцион',cost:71,hasDiscount:false,time:2,res:{rum:1,supplies:2,fresh_meat:3}},
+    { cat:'Разное',name:'Снасти',cost:30,hasDiscount:false,time:1,res:{wood:5,iron:1}},
+    { cat:'Разное',name:'Чугунные ядра',cost:144,hasDiscount:false,time:1,res:{iron:8}},
+    { cat:'Разное',name:'Брандскугели',cost:120,hasDiscount:false,time:1,res:{iron:5,battle_mark:2}},
+    { cat:'Разное',name:'Бомбы осколочные',cost:114,hasDiscount:false,time:1,res:{iron:5,copper:1}},
+    { cat:'Разное',name:'Малые поджигающие бочки',cost:400,hasDiscount:false,time:1,res:{wood:100,whale_oil:10}},
+    { cat:'Разное',name:'Большие осколочные мины',cost:4180,hasDiscount:false,time:1,res:{wood:200,animals:20}},
+    { cat:'Расходные предметы',name:'Деревяные заплатки',cost:25,hasDiscount:false,time:0,res:{wood:10}},
+    { cat:'Расходные предметы',name:'Железные заплатки',cost:540,hasDiscount:false,time:0,res:{iron:30}},
+    { cat:'Расходные предметы',name:'Бронзовые заплатки',cost:474,hasDiscount:false,time:0,res:{bronze:1}},
+    { cat:'Расходные предметы',name:'Заплатки из обломков',cost:600,hasDiscount:false,time:0,res:{debris:25,battle_mark:1}},
+    { cat:'Расходные предметы',name:'Деревянные ремонт-набор',cost:51,hasDiscount:false,time:0,res:{wood:10,cloth:8}},
+    { cat:'Расходные предметы',name:'Железные ремонт-набор',cost:492,hasDiscount:false,time:0,res:{iron:22,cloth:30}},
+    { cat:'Расходные предметы',name:'Бронзовый ремонт-набор',cost:540,hasDiscount:false,time:0,res:{bronze:1,sail:1}},
+    { cat:'Расходные предметы',name:'Походный рацион',cost:160,hasDiscount:false,time:0,res:{gold:100,rum:10}},
+    { cat:'Расходные предметы',name:'Малые добавочные паруса',cost:40,hasDiscount:false,time:0,res:{gold:40}},
+    { cat:'Расходные предметы',name:'Большие добавочные паруса',cost:133,hasDiscount:false,time:0,res:{sail:2}},
+    { cat:'Расходные предметы',name:'Малые пластины',cost:540,hasDiscount:false,time:0,res:{iron:30}},
+    { cat:'Расходные предметы',name:'Большие пластины',cost:3217,hasDiscount:false,time:0,res:{plate_res:1,battle_mark:5}},
+    { cat:'Расходные предметы',name:'Дымовая бомба',cost:5000,hasDiscount:false,time:0,res:{battle_mark:10}},
+    { cat:'Расходные предметы',name:'Дымовая завеса',cost:5720,hasDiscount:false,time:0,res:{iron:40,battle_mark:10}},
+    { cat:'Расходные предметы',name:'Подкуп',cost:10000,hasDiscount:false,time:0,res:{voodoo_skull:1}},
+    { cat:'Расходные предметы',name:'Черные двойной порох',cost:60,hasDiscount:false,time:0,res:{gold:60}},
+    { cat:'Расходные предметы',name:'Красный двойной порох',cost:60,hasDiscount:false,time:0,res:{gold:60}},
+    { cat:'Расходные предметы',name:'Белый двойной порох',cost:60,hasDiscount:false,time:0,res:{gold:60}},
+    { cat:'Расходные предметы',name:'Ром-паёк',cost:120,hasDiscount:false,time:0,res:{rum:20}},
+    { cat:'Расходные предметы',name:'Сытный паёк',cost:400,hasDiscount:false,time:0,res:{fish:20,fresh_meat:40}},
+    { cat:'Расходные предметы',name:'Фосфор',cost:2150,hasDiscount:false,time:0,res:{gold:150,battle_mark:4}},
+    { cat:'Расходные предметы',name:'Пороховой заряд',cost:2150,hasDiscount:false,time:0,res:{gold:150,battle_mark:4}},
+    { cat:'Расходные предметы',name:'Крюк Посейдона',cost:15000,hasDiscount:false,time:0,res:{gold:5000,voodoo_skull:1}},
+    { cat:'Расходные предметы',name:'Сигнальная ракета Синяя',cost:130,hasDiscount:false,time:0,res:{gold:130}},
+    { cat:'Расходные предметы',name:'Сигнальная ракета Красная',cost:200,hasDiscount:false,time:0,res:{gold:200}},
+    { cat:'Расходные предметы',name:'Сигнальная ракета Желтая',cost:5000,hasDiscount:false,time:0,res:{battle_mark:10}},
+    { cat:'Расходные предметы',name:'Горн',cost:10000,hasDiscount:false,time:0,res:{voodoo_skull:1}},
+];
+
+// ===== ИНИЦИАЛИЗАЦИЯ =====
+async function init() {
+    const loader = document.getElementById('loader');
+    const cont   = document.getElementById('craft-container');
+    const srcEl  = document.getElementById('src-indicator');
+
+    try {
+        ALL_ITEMS = await loadFromSupabase();
+        srcEl.innerHTML = '<span class="data-source live">🟢 Supabase</span>';
+    } catch(e) {
+        console.warn('Supabase недоступен, локальные данные:', e);
+        ALL_ITEMS = LOCAL_DATA;
+        srcEl.innerHTML = '<span class="data-source local">🟡 Локальные данные</span>';
+    }
+
+    loader.style.display = 'none';
+    cont.style.display   = 'block';
+
+    // Кнопки категорий
+    const catCont = document.getElementById('cat-filters');
+    CATS_ORDER.forEach(c => {
+        const btn = document.createElement('button');
+        btn.className = 'btn-filter';
+        btn.innerHTML = `${CAT_ICONS[c]} ${c}`;
+        btn.addEventListener('click', () => {
+            activeCategory = activeCategory === c ? null : c;
+            document.querySelectorAll('#cat-filters .btn-filter').forEach(b => b.classList.remove('active'));
+            if (activeCategory) btn.classList.add('active');
             render();
-        }
+        });
+        catCont.appendChild(btn);
+    });
 
-        init();
-    </script>
+    // Слайдер скидки
+    document.getElementById('discount-slider').addEventListener('input', e => setDiscount(e.target.value));
+    document.querySelectorAll('.preset-btn').forEach(b => b.addEventListener('click', () => setDiscount(b.dataset.val)));
+
+    // Поиск
+    document.getElementById('search-input').addEventListener('input', function() {
+        searchQuery = this.value.toLowerCase().trim();
+        render();
+    });
+
+    // Сортировка
+    document.getElementById('sort-desc').addEventListener('click', function() {
+        sortOrder = sortOrder === 'desc' ? null : 'desc';
+        this.classList.toggle('active', sortOrder === 'desc');
+        document.getElementById('sort-asc').classList.remove('active');
+        render();
+    });
+    document.getElementById('sort-asc').addEventListener('click', function() {
+        sortOrder = sortOrder === 'asc' ? null : 'asc';
+        this.classList.toggle('active', sortOrder === 'asc');
+        document.getElementById('sort-desc').classList.remove('active');
+        render();
+    });
+
+    // Сброс
+    document.getElementById('btn-reset').addEventListener('click', () => {
+        activeCategory = null; searchQuery = ''; sortOrder = null;
+        document.getElementById('search-input').value = '';
+        setDiscount(0);
+        document.querySelectorAll('#cat-filters .btn-filter').forEach(b => b.classList.remove('active'));
+        document.getElementById('sort-desc').classList.remove('active');
+        document.getElementById('sort-asc').classList.remove('active');
+    });
+
+    // Очистить калькулятор
+    document.getElementById('calc-clear').addEventListener('click', () => {
+        quantities = {};
+        render();
+    });
+
+    render();
+}
+
+init();
+</script>
 </body>
-
 </html>
