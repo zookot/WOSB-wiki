@@ -49,13 +49,13 @@
         .gun-info {
             flex: 1;
             min-width: 0;
-            padding: 12px 16px;
+            padding: 10px 16px;
         }
 
+        /* Шапка: только название */
         .gun-header {
             display: flex;
-            align-items: flex-start;
-            justify-content: space-between;
+            align-items: center;
             gap: 8px;
             margin-bottom: 8px;
         }
@@ -66,52 +66,54 @@
             color: #e8f4ff;
         }
 
-        .gun-prices {
+        /* ======================================
+           БЛОК ЦЕН — три колонки с подписями
+           ====================================== */
+        .gun-prices-row {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 6px;
+            margin-bottom: 10px;
+            padding: 8px 10px;
+            background: rgba(0, 0, 0, 0.18);
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+
+        .price-cell {
             display: flex;
             flex-direction: column;
-            align-items: flex-end;
-            gap: 4px;
-            flex-shrink: 0;
+            gap: 3px;
         }
 
-        .gun-cost {
-            font-size: 13px;
-            color: var(--gold-light);
-            font-weight: 700;
-            white-space: nowrap;
+        /* Разделители между колонками */
+        .price-cell + .price-cell {
+            border-left: 1px solid var(--border);
+            padding-left: 10px;
         }
 
-        .gun-cost-label {
-            font-size: 10px;
+        .price-cell-label {
+            font-size: 9px;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
             color: var(--text-muted);
-            font-weight: 400;
-            display: block;
-        }
-
-        .market-price {
-            font-size: 13px;
-            color: #4ade80;
-            font-weight: 700;
-        }
-
-        /* Бейдж прибыли */
-        .profit-badge {
-            font-size: 11px;
-            font-weight: 700;
-            padding: 2px 6px;
-            border-radius: 4px;
+            font-weight: 600;
             white-space: nowrap;
         }
-        .profit-badge.positive {
-            color: #4ade80;
-            background: rgba(74, 222, 128, 0.12);
-            border: 1px solid rgba(74, 222, 128, 0.25);
+
+        .price-cell-value {
+            font-size: 13px;
+            font-weight: 700;
+            white-space: nowrap;
         }
-        .profit-badge.negative {
-            color: #f87171;
-            background: rgba(248, 113, 113, 0.12);
-            border: 1px solid rgba(248, 113, 113, 0.25);
-        }
+
+        .price-cell-value.cost    { color: var(--gold-light); }
+        .price-cell-value.market  { color: #4ade80; }
+        .price-cell-value.income  { color: #4ade80; }
+        .price-cell-value.loss    { color: #f87171; }
+        .price-cell-value.na      { color: var(--text-muted); font-style: italic; font-size: 11px; }
+
+        /* ====================================== */
 
         .res-title {
             font-size: 10px;
@@ -199,12 +201,6 @@
             border-color: var(--accent);
         }
 
-        .price-value {
-            color: var(--gold-light);
-            font-weight: 700;
-            font-size: 13px;
-        }
-
         .sort-buttons {
             display: flex;
             gap: 4px;
@@ -232,10 +228,8 @@
             color: var(--accent2);
         }
 
-@keyframes spin {
-            to {
-                transform: rotate(360deg);
-            }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
         }
 
         .page-header {
@@ -380,12 +374,6 @@
         .total-sum span {
             color: var(--gold);
         }
-
-        @keyframes spin {
-            to {
-                transform: rotate(360deg);
-            }
-        }
     </style>
 </head>
 
@@ -488,7 +476,6 @@
                 const qty = quantities[g.name] || 0;
                 if (qty <= 0) return;
                 if (calcMode === 'profit') {
-                    // прибыль считаем только если есть и цена биржи, и себестоимость
                     if (g.profit !== null) total += g.profit * qty;
                 } else {
                     if (g.market_price > 0) total += g.market_price * qty;
@@ -511,7 +498,6 @@
             GUN_RES_COLS.forEach(c => { if (row[c] > 0) res[c] = row[c]; });
             const cost = row.craft_cost || 0;
             const market = row.market_price || 0;
-            // прибыль есть только когда знаем и цену биржи, и себестоимость крафта
             const profit = (cost > 0 && market > 0) ? market - cost : null;
             return { name: row.name, type: row.type, qty: row.qty || 1, cost, res, market_price: market, profit };
         }
@@ -527,8 +513,7 @@
                 const res = {};
                 GUN_RES_COLS.forEach(k => { if (g[k] > 0) res[k] = g[k]; });
                 const cost = g.cost || 0;
-                const market = 0; // локальные данные не знают рыночную цену
-                return { name: g.name, type: g.type, qty: g.qty || 1, cost, res, market_price: market, profit: null };
+                return { name: g.name, type: g.type, qty: g.qty || 1, cost, res, market_price: 0, profit: null };
             });
         }
 
@@ -542,17 +527,55 @@
 
         function sortedGuns(guns) {
             const sorted = [...guns];
-
-            if (sortOrder === 'desc') {
-                sorted.sort((a, b) => (b.market_price || 0) - (a.market_price || 0));
-            } else if (sortOrder === 'asc') {
-                sorted.sort((a, b) => (a.market_price || 0) - (b.market_price || 0));
-            }
-
+            if (sortOrder === 'desc') sorted.sort((a, b) => (b.market_price || 0) - (a.market_price || 0));
+            else if (sortOrder === 'asc') sorted.sort((a, b) => (a.market_price || 0) - (b.market_price || 0));
             return sorted;
         }
 
-function render() {
+        function buildPriceRow(g) {
+            // --- Колонка 1: Себестоимость крафта ---
+            let costHtml;
+            if (g.res.pirate_token > 0) {
+                costHtml = `<div class="price-cell-value na">Жетоны пиратов</div>`;
+            } else if (g.cost > 0) {
+                costHtml = `<div class="price-cell-value cost">${g.cost.toLocaleString('ru-RU')} 🪙</div>`;
+            } else {
+                costHtml = `<div class="price-cell-value na">—</div>`;
+            }
+
+            // --- Колонка 2: Цена на Бирже ---
+            const marketHtml = g.market_price > 0
+                ? `<div class="price-cell-value market">${Number(g.market_price).toLocaleString('ru-RU')} 🪙</div>`
+                : `<div class="price-cell-value na">Нет данных</div>`;
+
+            // --- Колонка 3: Доход / Убыток ---
+            let profitHtml;
+            if (g.profit === null) {
+                profitHtml = `<div class="price-cell-value na">—</div>`;
+            } else if (g.profit >= 0) {
+                profitHtml = `<div class="price-cell-value income">+${Math.round(g.profit).toLocaleString('ru-RU')} 🪙</div>`;
+            } else {
+                profitHtml = `<div class="price-cell-value loss">${Math.round(g.profit).toLocaleString('ru-RU')} 🪙</div>`;
+            }
+            const profitLabel = (g.profit !== null && g.profit < 0) ? 'Убыток' : 'Доход';
+
+            return `<div class="gun-prices-row">
+                <div class="price-cell">
+                    <div class="price-cell-label">Себестоимость крафта</div>
+                    ${costHtml}
+                </div>
+                <div class="price-cell">
+                    <div class="price-cell-label">Цена на Бирже</div>
+                    ${marketHtml}
+                </div>
+                <div class="price-cell">
+                    <div class="price-cell-label">${profitLabel}</div>
+                    ${profitHtml}
+                </div>
+            </div>`;
+        }
+
+        function render() {
             const guns = sortedGuns(filtered());
             document.getElementById('gun-count').textContent = guns.length;
 
@@ -572,19 +595,6 @@ function render() {
                     </div>`;
                 }).join('');
 
-                const craftCost = g.cost > 0
-                    ? `<div style="color:var(--gold-light);font-size:12px;font-weight:700">${g.cost.toLocaleString('ru-RU')} 🪙</div><div class="gun-cost-label">себестоимость</div>`
-                    : `<div style="color:var(--text-muted);font-size:11px">— только биржа</div>`;
-
-                const marketPrice = g.market_price
-                    ? `<div style="color:#4ade80;font-size:12px;font-weight:700">${Number(g.market_price).toLocaleString('ru-RU')} 🪙</div>`
-                    : `<div style="color:var(--text-muted);font-size:11px;font-style:italic">n/a</div>`;
-
-                // Бейдж прибыли: показываем только когда есть и цена биржи, и себестоимость
-                const profitBadge = g.profit !== null
-                    ? `<div class="profit-badge ${g.profit >= 0 ? 'positive' : 'negative'}">${g.profit >= 0 ? '+' : ''}${Math.round(g.profit).toLocaleString('ru-RU')} 🪙</div>`
-                    : '';
-
                 const iconHtml = g.img
                     ? `<img src="resources/${g.img}" alt="${g.name}">`
                     : GUN_TYPE_ICONS[g.type] || '💥';
@@ -601,20 +611,16 @@ function render() {
                 </div>` : '';
 
                 const isFav = favorites[g.name];
-                const favBtn = `<button class="fav-btn" data-name="${g.name}" style="background:none;border:none;cursor:pointer;font-size:18px;color:${isFav ? 'var(--gold)' : 'var(--text-muted)'}">${isFav ? '★' : '☆'}</button>`;
+                const favBtn = `<button class="fav-btn" data-name="${g.name}" style="color:${isFav ? 'var(--gold)' : 'var(--text-muted)'}">${isFav ? '★' : '☆'}</button>`;
 
                 return `<div class="gun-card${isFav ? ' favorited' : ''}" data-name="${g.name}" data-price="${g.market_price || 0}">
                     <div class="gun-icon">${iconHtml}</div>
                     <div class="gun-info">
                         <div class="gun-header">
                             <div class="gun-name">${g.name}${g.qty > 1 ? ` <span style="color:var(--text-muted);font-size:12px">×${g.qty}</span>` : ''}</div>
-                            <div class="gun-prices">
-                                <div>${craftCost}</div>
-                                <div style="margin-top:4px">${marketPrice}</div>
-                                ${profitBadge ? `<div style="margin-top:4px">${profitBadge}</div>` : ''}
-                            </div>
                         </div>
-                        <div class="res-title">Ресурсы для крафт</div>
+                        ${buildPriceRow(g)}
+                        <div class="res-title">Ресурсы для крафта</div>
                         <div class="res-grid">${res || '<span style="color:var(--text-muted);font-size:11px">нет ресурсов</span>'}</div>
                     </div>
                     <div class="gun-footer">
@@ -625,7 +631,7 @@ function render() {
             }).join('');
 
             let html = '';
-            
+
             if (favoritesList.length > 0) {
                 html += `<div class="type-section">
                     <div class="type-header" style="color:var(--gold)">★ Избранное</div>
@@ -736,7 +742,6 @@ function render() {
 
             loader.style.display = 'none';
             cont.style.display = 'block';
-
             finishInit();
         }
 
@@ -800,7 +805,6 @@ function render() {
 
             document.getElementById('profit-clear').addEventListener('click', clearAllQuantities);
 
-            // Переключатель режима калькулятора: Выручка ↔ Прибыль
             document.getElementById('calc-mode-toggle').addEventListener('click', function() {
                 calcMode = calcMode === 'revenue' ? 'profit' : 'revenue';
                 const icon = document.getElementById('calc-mode-icon');
