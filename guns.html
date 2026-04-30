@@ -9,38 +9,6 @@
     <link rel="stylesheet" href="css/style.css">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        /* ===== АДАПТИВНАЯ СЕТКА КАРТОЧЕК ===== */
-        .guns-grid {
-            display: grid;
-            gap: 8px;
-            grid-template-columns: 1fr;
-        }
-        @media (min-width: 860px) {
-            .guns-grid { grid-template-columns: repeat(2, 1fr); }
-        }
-        @media (min-width: 1300px) {
-            .guns-grid { grid-template-columns: repeat(3, 1fr); }
-        }
-
-        /* ===== SCROLL-REVEAL ===== */
-        .gun-card {
-            opacity: 0;
-            transform: translateY(14px);
-            transition:
-                opacity 0.38s ease,
-                transform 0.38s ease,
-                border-color 0.3s cubic-bezier(0.34,1.56,0.64,1),
-                background 0.3s cubic-bezier(0.34,1.56,0.64,1),
-                box-shadow 0.3s cubic-bezier(0.34,1.56,0.64,1);
-        }
-        .gun-card.revealed {
-            opacity: 1;
-            transform: translateY(0);
-        }
-        @media (prefers-reduced-motion: reduce) {
-            .gun-card { opacity: 1; transform: none; }
-        }
-
         /* ===== КАРТОЧКА ===== */
         .gun-card {
             background: var(--bg-card);
@@ -49,6 +17,7 @@
             padding: 0;
             display: grid;
             grid-template-columns: 60px 1fr;
+            transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
             overflow: hidden;
             cursor: pointer;
             position: relative;
@@ -61,7 +30,7 @@
 
         .gun-card.expanded {
             border-color: var(--accent2);
-            box-shadow: 0 0 0 1px rgba(42,159,214,0.2), 0 4px 20px rgba(0,0,0,0.3);
+            box-shadow: 0 0 0 1px rgba(42, 159, 214, 0.2), 0 4px 20px rgba(0,0,0,0.3);
         }
 
         .gun-card.expanded.favorited {
@@ -72,7 +41,7 @@
         .gun-icon {
             width: 60px;
             height: 60px;
-            background: linear-gradient(135deg, var(--bg-dark), rgba(30,111,168,0.2));
+            background: linear-gradient(135deg, var(--bg-dark), rgba(30, 111, 168, 0.2));
             border: none;
             border-right: 1px solid var(--border);
             display: flex;
@@ -113,11 +82,12 @@
             text-overflow: ellipsis;
         }
 
+        /* expand chevron */
         .expand-chevron {
             font-size: 11px;
             color: var(--text-muted);
             margin-left: 2px;
-            transition: transform 0.35s cubic-bezier(0.4,0,0.2,1);
+            transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
             display: inline-block;
             line-height: 1;
             flex-shrink: 0;
@@ -128,33 +98,13 @@
             color: var(--accent2);
         }
 
-        /* ===== PROFIT BADGE на карточке ===== */
-        .profit-badge {
-            font-size: 10px;
-            font-weight: 700;
-            padding: 2px 6px;
-            border-radius: 4px;
-            white-space: nowrap;
-            flex-shrink: 0;
-        }
-        .profit-badge.income {
-            background: rgba(74, 222, 128, 0.12);
-            color: #4ade80;
-            border: 1px solid rgba(74, 222, 128, 0.25);
-        }
-        .profit-badge.loss {
-            background: rgba(248, 113, 113, 0.12);
-            color: #f87171;
-            border: 1px solid rgba(248, 113, 113, 0.25);
-        }
-
         /* ===== БЛОК ЦЕН ===== */
         .gun-prices-row {
             display: flex;
             align-items: stretch;
             flex-shrink: 0;
             margin-left: auto;
-            background: rgba(0,0,0,0.22);
+            background: rgba(0, 0, 0, 0.22);
             border-radius: 7px;
             border: 1px solid var(--border);
             overflow: hidden;
@@ -189,11 +139,11 @@
             line-height: 1.3;
         }
 
-        .price-cell-value.cost   { color: var(--gold-light); }
-        .price-cell-value.market { color: #4ade80; }
-        .price-cell-value.income { color: #4ade80; }
-        .price-cell-value.loss   { color: #f87171; }
-        .price-cell-value.na     { color: var(--text-muted); font-style: italic; font-size: 10px; }
+        .price-cell-value.cost    { color: var(--gold-light); }
+        .price-cell-value.market  { color: #4ade80; }
+        .price-cell-value.income  { color: #4ade80; }
+        .price-cell-value.loss    { color: #f87171; }
+        .price-cell-value.na      { color: var(--text-muted); font-style: italic; font-size: 10px; }
 
         /* ===== РЕСУРСЫ ===== */
         .res-title {
@@ -219,12 +169,12 @@
             border-top: 1px solid var(--border);
         }
 
-        /* ===== РАСКРЫТИЕ КАРТОЧКИ ===== */
+        /* ===== БЛОК 1: РАСКРЫТИЕ КАРТОЧКИ ===== */
         .gun-expand {
             grid-column: 1 / -1;
             max-height: 0;
             overflow: hidden;
-            transition: max-height 0.45s cubic-bezier(0.4,0,0.2,1),
+            transition: max-height 0.45s cubic-bezier(0.4, 0, 0.2, 1),
                         opacity 0.3s ease;
             opacity: 0;
         }
@@ -236,7 +186,7 @@
 
         .gun-expand-inner {
             border-top: 1px solid var(--border);
-            background: rgba(0,0,0,0.22);
+            background: rgba(0, 0, 0, 0.22);
             padding: 14px 16px;
             display: flex;
             flex-direction: column;
@@ -248,10 +198,13 @@
                 flex-direction: row;
                 align-items: flex-start;
             }
-            .expand-section { flex: 1; min-width: 0; }
+            .expand-section {
+                flex: 1;
+                min-width: 0;
+            }
         }
 
-        /* ===== ТАБЛИЦА СЕБЕСТОИМОСТИ ===== */
+        /* ===== БЛОК 3: ТАБЛИЦА СЕБЕСТОИМОСТИ ===== */
         .expand-section-title {
             font-size: 10px;
             font-weight: 700;
@@ -264,7 +217,9 @@
             gap: 6px;
         }
 
-        .expand-table-wrap { overflow-x: auto; }
+        .expand-table-wrap {
+            overflow-x: auto;
+        }
 
         .expand-table {
             width: 100%;
@@ -335,7 +290,11 @@
         }
 
         /* ===== ФИНАНСОВЫЕ ПОКАЗАТЕЛИ ===== */
-        .fin-grid { display: flex; flex-direction: column; gap: 5px; }
+        .fin-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
 
         .fin-row {
             display: flex;
@@ -349,7 +308,10 @@
             border: 1px solid rgba(255,255,255,0.04);
         }
 
-        .fin-label { color: var(--text-muted); white-space: nowrap; }
+        .fin-label {
+            color: var(--text-muted);
+            white-space: nowrap;
+        }
 
         .fin-value {
             font-weight: 700;
@@ -377,8 +339,10 @@
             border: 1px solid rgba(255,255,255,0.06);
         }
 
-        /* ===== СЕКЦИИ ПО ТИПУ ===== */
-        .type-section { margin-bottom: 28px; }
+        /* ===== ОСТАЛЬНЫЕ СТИЛИ (без изменений) ===== */
+        .type-section {
+            margin-bottom: 28px;
+        }
 
         .type-header {
             font-family: 'Cinzel', serif;
@@ -396,19 +360,6 @@
             flex: 1;
             height: 1px;
             background: var(--border);
-        }
-
-        /* ===== БЕЙДЖ КЛИЧЕСТВА В ЗАГОЛОВКЕ ===== */
-        .type-count-badge {
-            font-size: 11px;
-            font-weight: 600;
-            background: rgba(42, 159, 214, 0.12);
-            color: var(--accent2);
-            border: 1px solid rgba(42, 159, 214, 0.25);
-            border-radius: 10px;
-            padding: 1px 7px;
-            font-family: sans-serif;
-            flex-shrink: 0;
         }
 
         .data-source {
@@ -453,7 +404,10 @@
             border-color: var(--accent);
         }
 
-        .sort-buttons { display: flex; gap: 4px; }
+        .sort-buttons {
+            display: flex;
+            gap: 4px;
+        }
 
         .sort-btn {
             padding: 4px 10px;
@@ -477,48 +431,6 @@
             color: var(--accent2);
         }
 
-        /* ===== КНОПКА ЭКСПОРТ CSV ===== */
-        .export-csv-btn {
-            padding: 4px 12px;
-            border-radius: 6px;
-            font-size: 12px;
-            font-weight: 600;
-            background: rgba(74, 222, 128, 0.1);
-            border: 1px solid rgba(74, 222, 128, 0.3);
-            color: #4ade80;
-            cursor: pointer;
-            transition: all 0.2s;
-            white-space: nowrap;
-        }
-
-        .export-csv-btn:hover {
-            background: rgba(74, 222, 128, 0.2);
-            border-color: #4ade80;
-        }
-
-        /* ===== ФИЛЬТР ПРИБЫЛЬНЫХ ===== */
-        .profit-filter-btn {
-            padding: 4px 10px;
-            border-radius: 6px;
-            font-size: 12px;
-            background: rgba(255,255,255,0.05);
-            border: 1px solid var(--border);
-            color: var(--text-muted);
-            cursor: pointer;
-            transition: all 0.2s;
-            white-space: nowrap;
-        }
-        .profit-filter-btn:hover {
-            background: rgba(74,222,128,0.1);
-            color: #4ade80;
-            border-color: rgba(74,222,128,0.3);
-        }
-        .profit-filter-btn.active {
-            background: rgba(74, 222, 128, 0.15);
-            border-color: rgba(74, 222, 128, 0.4);
-            color: #4ade80;
-        }
-
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
@@ -528,12 +440,11 @@
             align-items: flex-start;
             justify-content: space-between;
             gap: 20px;
-            flex-wrap: wrap;
         }
 
         .profit-calculator {
-            background: linear-gradient(135deg, rgba(74,222,128,0.08), rgba(201,162,39,0.08));
-            border: 1px solid rgba(74,222,128,0.25);
+            background: linear-gradient(135deg, rgba(74, 222, 128, 0.08), rgba(201, 162, 39, 0.08));
+            border: 1px solid rgba(74, 222, 128, 0.25);
             border-radius: 10px;
             padding: 10px 16px;
             display: flex;
@@ -559,26 +470,26 @@
             border-radius: 6px;
             font-size: 11px;
             font-weight: 600;
-            background: rgba(248,113,113,0.15);
-            border: 1px solid rgba(248,113,113,0.35);
+            background: rgba(248, 113, 113, 0.15);
+            border: 1px solid rgba(248, 113, 113, 0.35);
             color: #f87171;
             cursor: pointer;
             transition: all 0.2s;
         }
 
         .profit-clear-btn:hover {
-            background: rgba(248,113,113,0.25);
+            background: rgba(248, 113, 113, 0.25);
             border-color: #f87171;
         }
 
         .gun-card.favorited {
             border-color: var(--gold);
-            background: linear-gradient(135deg, rgba(201,162,39,0.15), rgba(201,162,39,0.05));
+            background: linear-gradient(135deg, rgba(201, 162, 39, 0.15), rgba(201, 162, 39, 0.05));
         }
 
         .gun-card.favorited:hover {
             border-color: var(--gold-light);
-            background: linear-gradient(135deg, rgba(201,162,39,0.2), rgba(201,162,39,0.1));
+            background: linear-gradient(135deg, rgba(201, 162, 39, 0.2), rgba(201, 162, 39, 0.1));
         }
 
         .gun-card.lifted {
@@ -586,8 +497,8 @@
         }
 
         @keyframes liftCard {
-            0%   { transform: translateY(10px); opacity: 0.5; }
-            100% { transform: translateY(0);    opacity: 1;   }
+            0% { transform: translateY(10px); opacity: 0.5; }
+            100% { transform: translateY(0); opacity: 1; }
         }
 
         .quantity-control {
@@ -658,7 +569,9 @@
             font-weight: 700;
         }
 
-        .total-sum span { color: var(--gold); }
+        .total-sum span {
+            color: var(--gold);
+        }
     </style>
 </head>
 
@@ -687,7 +600,6 @@
                 </div>
                 <div class="profit-calculator-value" id="profit-total">0 🪙</div>
                 <button class="sort-btn" id="calc-mode-toggle" title="Переключить режим">≈ Прибыль</button>
-                <button class="export-csv-btn" id="export-csv" title="Экспорт в CSV">⬇ CSV</button>
                 <button class="profit-clear-btn" id="profit-clear">Очистить</button>
             </div>
         </div>
@@ -714,10 +626,6 @@
                     <button class="sort-btn" id="sort-asc" title="Сначала дешёвые">↑ Дешёвые</button>
                 </div>
             </div>
-            <div class="filter-group">
-                <div class="filter-label">📈 Выгода</div>
-                <button class="profit-filter-btn" id="profit-only-btn" title="Только выгодные для крафта">💹 Только в плюс</button>
-            </div>
             <button class="btn-reset" id="btn-reset">↺ Сбросить</button>
         </div>
 
@@ -739,6 +647,7 @@
         // ===== КОНСТАНТЫ =====
         const GUN_RES_COLS = ['gold', 'iron', 'copper', 'bronze', 'rum', 'volcanic', 'pirate_token', 'battle_mark'];
 
+        // Маппинг колонки guns → название в таблице resources
         const RES_COL_TO_NAME = {
             gold:        'Золото',
             iron:        'Железо',
@@ -762,29 +671,28 @@
 
         // ===== СОСТОЯНИЕ =====
         let ALL_GUNS      = [];
-        let ALL_RESOURCES = [];
-        let expandedCards = new Set();
+        let ALL_RESOURCES = [];   // Блок 2: загружается из Supabase
+        let expandedCards = new Set(); // Блок 1: открытые карточки
 
-        let activeType   = null;
-        let searchQuery  = '';
-        let priceMin     = 0;
-        let sortOrder    = null;
-        let calcMode     = 'revenue';
-        let profitOnly   = false;   // фильтр «только в плюс»
+        let activeType  = null;
+        let searchQuery = '';
+        let priceMin    = 0;
+        let sortOrder   = null;
+        let calcMode    = 'revenue';
 
         let quantities = JSON.parse(localStorage.getItem('wosb_gun_quantities') || '{}');
         let favorites  = JSON.parse(localStorage.getItem('wosb_gun_favorites')  || '{}');
 
         // ===== ХРАНЕНИЕ =====
-        function saveQuantities() { try { localStorage.setItem('wosb_gun_quantities', JSON.stringify(quantities)); } catch(e){} }
-        function saveFavorites()  { try { localStorage.setItem('wosb_gun_favorites',  JSON.stringify(favorites));  } catch(e){} }
+        function saveQuantities() { localStorage.setItem('wosb_gun_quantities', JSON.stringify(quantities)); }
+        function saveFavorites()  { localStorage.setItem('wosb_gun_favorites',  JSON.stringify(favorites));  }
 
         function toggleFavorite(name) {
             favorites[name] = !favorites[name];
             saveFavorites();
         }
 
-        // ===== ЦЕНЫ РЕСУРСОВ (из Supabase resources) =====
+        // ===== БЛОК 2: ЦЕНЫ РЕСУРСОВ =====
         function getUnitPrice(col) {
             const resName = RES_COL_TO_NAME[col];
             if (!resName) return 0;
@@ -793,7 +701,7 @@
             return r.is_base ? Number(r.cost_avg) : Number(r.cost_calc);
         }
 
-        // ===== БЛОК РАСКРЫТИЯ: СТРУКТУРА СЕБЕСТОИМОСТИ =====
+        // ===== БЛОК 3: СТРУКТУРА СЕБЕСТОИМОСТИ =====
         function buildExpandHTML(g, qty) {
             const effectiveQty = Math.max(qty || 1, 1);
             const craftEntries = Object.entries(g.res).filter(([col]) => col !== 'pirate_token');
@@ -814,6 +722,7 @@
                 </div>`;
             }
 
+            // Считаем строки таблицы
             let totalCost = 0;
             const rows = craftEntries.map(([col, amount]) => {
                 const unitPrice  = getUnitPrice(col);
@@ -893,7 +802,7 @@
             const margin = (profit !== null && marketVal > 0)         ? profit / marketVal * 100 : null;
             const roi    = (profit !== null && craftCost > 0)         ? profit / craftCost * 100 : null;
 
-            const pc   = profit !== null ? (profit >= 0 ? 'income' : 'loss') : '';
+            const pc = profit !== null ? (profit >= 0 ? 'income' : 'loss') : '';
             const sign = profit !== null && profit > 0 ? '+' : '';
 
             const roiNote = roi !== null && roi > 0
@@ -927,7 +836,7 @@
             </div>`;
         }
 
-        // ===== КАЛЬКУЛЯТОР =====
+        // ===== ДАННЫЕ =====
         function updateProfitTotal() {
             let total = 0;
             ALL_GUNS.forEach(g => {
@@ -951,48 +860,6 @@
             updateProfitTotal();
         }
 
-        // ===== ЭКСПОРТ CSV =====
-        function exportCSV() {
-            const rows = [['Название', 'Тип', 'Кол-во', 'Крафт (🪙)', 'Биржа (🪙)', 'Прибыль (🪙)', 'Итого выручка (🪙)']];
-            ALL_GUNS.forEach(g => {
-                const qty = quantities[g.name] || 0;
-                if (qty <= 0) return;
-                rows.push([
-                    `"${g.name}"`,
-                    g.type,
-                    qty,
-                    g.cost || '',
-                    g.market_price || '',
-                    g.profit !== null ? Math.round(g.profit) : '',
-                    g.market_price > 0 ? g.market_price * qty : ''
-                ]);
-            });
-            if (rows.length === 1) {
-                // Нет выбранных — экспортируем все видимые
-                filtered().forEach(g => {
-                    rows.push([
-                        `"${g.name}"`,
-                        g.type,
-                        '',
-                        g.cost || '',
-                        g.market_price || '',
-                        g.profit !== null ? Math.round(g.profit) : '',
-                        ''
-                    ]);
-                });
-            }
-            const csv = rows.map(r => r.join(',')).join('\n');
-            const bom  = '\uFEFF'; // UTF-8 BOM для Excel
-            const blob = new Blob([bom + csv], { type: 'text/csv;charset=utf-8;' });
-            const url  = URL.createObjectURL(blob);
-            const a    = document.createElement('a');
-            a.href     = url;
-            a.download = 'wosb_guns.csv';
-            a.click();
-            URL.revokeObjectURL(url);
-        }
-
-        // ===== ДАННЫЕ =====
         function dbToGun(row) {
             const res = {};
             GUN_RES_COLS.forEach(c => { if (row[c] > 0) res[c] = row[c]; });
@@ -1028,8 +895,7 @@
             return ALL_GUNS.filter(g =>
                 (!activeType || g.type === activeType) &&
                 (!searchQuery || g.name.toLowerCase().includes(searchQuery)) &&
-                ((g.market_price || 0) >= priceMin) &&
-                (!profitOnly || (g.profit !== null && g.profit > 0))
+                ((g.market_price || 0) >= priceMin)
             );
         }
 
@@ -1040,7 +906,7 @@
             return sorted;
         }
 
-        // ===== СТРОИМ БЛОК ЦЕН =====
+        // ===== СТРОИМ СТРОКУ ЦЕН =====
         function buildPriceRow(g) {
             let costHtml;
             if (g.res.pirate_token > 0) {
@@ -1081,18 +947,6 @@
             </div>`;
         }
 
-        // ===== PROFIT BADGE =====
-        function buildProfitBadge(g) {
-            if (g.profit === null || g.market_price <= 0) return '';
-            if (g.profit > 0) {
-                const pct = (g.profit / g.market_price * 100).toFixed(0);
-                return `<span class="profit-badge income">+${pct}%</span>`;
-            } else {
-                const pct = (g.profit / g.market_price * 100).toFixed(0);
-                return `<span class="profit-badge loss">${pct}%</span>`;
-            }
-        }
-
         // ===== РЕНДЕР =====
         function render() {
             const guns  = sortedGuns(filtered());
@@ -1115,11 +969,11 @@
                 }).join('');
 
                 const iconHtml = g.img
-                    ? `<img src="resources/${g.img}" alt="${g.name}" loading="lazy">`
+                    ? `<img src="resources/${g.img}" alt="${g.name}">`
                     : GUN_TYPE_ICONS[g.type] || '💥';
 
-                const qty        = quantities[g.name] || 0;
-                const unitPrice  = g.market_price || 0;
+                const qty       = quantities[g.name] || 0;
+                const unitPrice = g.market_price || 0;
                 const totalPrice = unitPrice * qty;
 
                 const qtyCtrl = unitPrice > 0 ? `<div class="quantity-control">
@@ -1133,11 +987,10 @@
                 const favBtn   = `<button class="fav-btn" data-name="${g.name}" style="color:${isFav ? 'var(--gold)' : 'var(--text-muted)'}"> ${isFav ? '★' : '☆'}</button>`;
                 const isExpanded = expandedCards.has(g.name);
 
+                // Блок 1+3: раскрытый контент (строится сразу при рендере если карточка открыта)
                 const expandContent = isExpanded
                     ? buildExpandHTML(g, Math.max(qty, 1))
                     : '';
-
-                const profitBadge = buildProfitBadge(g);
 
                 return `<div class="gun-card${isFav ? ' favorited' : ''}${isExpanded ? ' expanded' : ''}" data-name="${g.name}" data-price="${g.market_price || 0}">
                     <div class="gun-icon">${iconHtml}</div>
@@ -1146,7 +999,6 @@
                             <div class="gun-name">${g.name}${g.qty > 1 ? ` <span style="color:var(--text-muted);font-size:12px">×${g.qty}</span>` : ''}
                                 <span class="expand-chevron">▼</span>
                             </div>
-                            ${profitBadge}
                             ${buildPriceRow(g)}
                         </div>
                         <div class="res-title">Ресурсы для крафта</div>
@@ -1164,10 +1016,8 @@
 
             if (favoritesList.length > 0) {
                 html += `<div class="type-section">
-                    <div class="type-header" style="color:var(--gold)">★ Избранное
-                        <span class="type-count-badge" style="background:rgba(201,162,39,0.12);color:var(--gold);border-color:rgba(201,162,39,0.3)">${favoritesList.length}</span>
-                    </div>
-                    <div class="guns-grid">${renderCards(favoritesList)}</div>
+                    <div class="type-header" style="color:var(--gold)">★ Избранное</div>
+                    <div style="display:grid;gap:8px;">${renderCards(favoritesList)}</div>
                 </div>`;
             }
 
@@ -1175,40 +1025,18 @@
                 const items = byType[type].filter(g => !favorites[g.name]);
                 if (!items.length) return '';
                 return `<div class="type-section">
-                    <div class="type-header">${GUN_TYPE_ICONS[type]} ${type}
-                        <span class="type-count-badge">${items.length}</span>
-                    </div>
-                    <div class="guns-grid">${renderCards(items)}</div>
+                    <div class="type-header">${GUN_TYPE_ICONS[type]} ${type}</div>
+                    <div style="display:grid;gap:8px;">${renderCards(items)}</div>
                 </div>`;
             }).join('');
 
             document.getElementById('guns-container').innerHTML = html;
             updateProfitTotal();
-            initScrollReveal();
         }
 
-        // ===== SCROLL-REVEAL =====
-        function initScrollReveal() {
-            if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-                document.querySelectorAll('.gun-card').forEach(c => c.classList.add('revealed'));
-                return;
-            }
-            const observer = new IntersectionObserver((entries) => {
-                entries.forEach((entry, i) => {
-                    if (entry.isIntersecting) {
-                        setTimeout(() => {
-                            entry.target.classList.add('revealed');
-                        }, Math.min(i * 40, 300));
-                        observer.unobserve(entry.target);
-                    }
-                });
-            }, { threshold: 0.08, rootMargin: '0px 0px -20px 0px' });
-
-            document.querySelectorAll('.gun-card:not(.revealed)').forEach(c => observer.observe(c));
-        }
-
-        // ===== СОБЫТИЯ КАРТОЧЕК =====
+        // ===== СОБЫТИЯ =====
         function attachCardEvents() {
+            // Кнопки количества
             document.querySelectorAll('.qty-minus').forEach(btn => {
                 btn.addEventListener('click', (e) => {
                     e.stopPropagation();
@@ -1248,6 +1076,7 @@
                 });
             });
 
+            // Избранное
             document.querySelectorAll('.fav-btn').forEach(btn => {
                 btn.addEventListener('click', (e) => {
                     e.stopPropagation();
@@ -1258,8 +1087,10 @@
                 });
             });
 
+            // БЛОК 1: клик по карточке — раскрытие/закрытие
             document.querySelectorAll('.gun-card').forEach(card => {
                 card.addEventListener('click', (e) => {
+                    // Не реагируем на клик по интерактивным элементам внутри карточки
                     if (e.target.closest('button, input, .quantity-control, .fav-btn')) return;
 
                     const name = card.dataset.name;
@@ -1267,15 +1098,18 @@
                     if (!gun) return;
 
                     if (expandedCards.has(name)) {
+                        // Закрываем: убираем класс и чистим контент после анимации
                         expandedCards.delete(name);
                         card.classList.remove('expanded');
                         const expandEl = card.querySelector('.gun-expand');
                         if (expandEl) {
+                            // Ждём конца анимации, потом очищаем контент
                             expandEl.addEventListener('transitionend', () => {
                                 if (!expandedCards.has(name)) expandEl.innerHTML = '';
                             }, { once: true });
                         }
                     } else {
+                        // Открываем: добавляем класс и сразу рендерим содержимое
                         expandedCards.add(name);
                         card.classList.add('expanded');
                         const expandEl = card.querySelector('.gun-expand');
@@ -1314,7 +1148,11 @@
             }, 8000);
 
             try {
-                const [guns, resources] = await Promise.all([loadGuns(), loadResources()]);
+                // Блок 2: загружаем guns и resources параллельно
+                const [guns, resources] = await Promise.all([
+                    loadGuns(),
+                    loadResources()
+                ]);
                 clearTimeout(fallbackTimeout);
                 ALL_GUNS      = guns;
                 ALL_RESOURCES = resources;
@@ -1381,10 +1219,8 @@
                 searchQuery = '';
                 priceMin    = 0;
                 sortOrder   = null;
-                profitOnly  = false;
                 document.getElementById('search-input').value = '';
                 document.getElementById('price-filter').value = '';
-                document.getElementById('profit-only-btn').classList.remove('active');
                 document.querySelectorAll('.btn-filter, .sort-btn').forEach(b => b.classList.remove('active', 'active-type'));
                 render();
                 attachCardEvents();
@@ -1398,15 +1234,6 @@
                 document.getElementById('calc-mode-text').textContent = calcMode === 'profit' ? 'Прибыль' : 'Выручка';
                 this.textContent = calcMode === 'profit' ? '≈ Выручка' : '≈ Прибыль';
                 updateProfitTotal();
-            });
-
-            document.getElementById('export-csv').addEventListener('click', exportCSV);
-
-            document.getElementById('profit-only-btn').addEventListener('click', function() {
-                profitOnly = !profitOnly;
-                this.classList.toggle('active', profitOnly);
-                render();
-                attachCardEvents();
             });
 
             render();
