@@ -136,6 +136,7 @@
 
         .price-cell-value.cost    { color: var(--gold-light); }
         .price-cell-value.saving  { color: #4ade80; }
+        .price-cell-value.loss    { color: #f87171; }
         .price-cell-value.na      { color: var(--text-muted); font-style: italic; font-size: 10px; }
 
         /* ===== РЕСУРСЫ В ШАПКЕ ===== */
@@ -343,6 +344,7 @@
         }
 
         .fin-value.saving { color: #4ade80; }
+        .fin-value.loss   { color: #f87171; }
 
         /* ===== КАЛЬКУЛЯТОР ===== */
         .craft-calculator {
@@ -665,12 +667,21 @@ let sortOrder      = null;
 let discount       = 0;
 
 // ===== ЦЕНЫ РЕСУРСОВ =====
+// is_base=true  → берём cost_avg  (базовый ресурс, цена биржи)
+// is_base=false → берём cost_calc (производной ресурс, цена из базовых)
 function getUnitPrice(col) {
     const resName = RES_COL_TO_NAME[col];
     if (!resName) return 0;
     const r = ALL_RESOURCES.find(x => x.name === resName);
     if (!r) return 0;
     return r.is_base ? Number(r.cost_avg) : Number(r.cost_calc);
+}
+
+// ===== СЕБЕСТОИМОСТЬ КРАФТА ИЗ РЕСУРСОВ =====
+function calcCraftCost(item) {
+    return Object.entries(item.res || {})
+        .filter(([, v]) => v > 0)
+        .reduce((sum, [col, amt]) => sum + amt * getUnitPrice(col), 0);
 }
 
 // ===== ТАБЛИЦА СЕБЕСТОИМОСТИ =====
@@ -720,28 +731,34 @@ function buildExpandHTML(item, qty) {
     const titleSuffix = totalCost > 0 ? ` (${Math.round(totalCost).toLocaleString('ru-RU')} 🪙)` : '';
 
     // Финансовый блок
-    const baseCost = item.cost || 0;
-    const discCost = item.hasDiscount && discount > 0 ? baseCost * (1 - discount/100) : null;
-    const saving   = discCost !== null ? baseCost - discCost : null;
+    const craftCostDisc = item.hasDiscount && discount > 0
+        ? totalCost * (1 - discount / 100)
+        : totalCost;
+    const marketPrice   = item.market_price || 0;
+    const income        = (marketPrice > 0 && craftCostDisc > 0) ? marketPrice - craftCostDisc : null;
+    const saving        = (item.hasDiscount && discount > 0 && totalCost > 0) ? totalCost - craftCostDisc : null;
+
+    const incomeClass = income === null ? '' : (income >= 0 ? 'saving' : 'loss');
+    const incomeSign  = income !== null ? (income >= 0 ? '+' : '') : '';
 
     const finHTML = `<div class="expand-section">
         <div class="expand-section-title">💹 Финансовые показатели${effectiveQty > 1 ? ' (×' + effectiveQty + ' шт.)' : ''}</div>
         <div class="fin-grid">
-            ${baseCost ? `<div class="fin-row">
-                <span class="fin-label">💰 Себестоимость</span>
-                <span class="fin-value">${fmt(baseCost * effectiveQty)} 🪙</span>
-            </div>` : ''}
-            ${discCost !== null ? `<div class="fin-row">
-                <span class="fin-label">🏷️ Со скидкой ${discount}%</span>
-                <span class="fin-value saving">${fmt(discCost * effectiveQty)} 🪙</span>
+            ${totalCost > 0 ? `<div class="fin-row">
+                <span class="fin-label">🔨 Крафт (из ресурсов)</span>
+                <span class="fin-value">${fmt(totalCost * effectiveQty)} 🪙</span>
             </div>` : ''}
             ${saving !== null ? `<div class="fin-row">
-                <span class="fin-label">✂️ Экономия</span>
-                <span class="fin-value saving">−${fmt(saving * effectiveQty)} 🪙</span>
+                <span class="fin-label">🏷️ Крафт со скидкой ${discount}%</span>
+                <span class="fin-value saving">${fmt(craftCostDisc * effectiveQty)} 🪙</span>
             </div>` : ''}
-            ${totalCost > 0 ? `<div class="fin-row">
-                <span class="fin-label">📊 Цена ресурсов</span>
-                <span class="fin-value">${fmt(totalCost)} 🪙</span>
+            ${marketPrice > 0 ? `<div class="fin-row">
+                <span class="fin-label">📈 Биржа</span>
+                <span class="fin-value">${fmt(marketPrice * effectiveQty)} 🪙</span>
+            </div>` : ''}
+            ${income !== null ? `<div class="fin-row">
+                <span class="fin-label">💰 Доход</span>
+                <span class="fin-value ${incomeClass}">${incomeSign}${fmt(income * effectiveQty)} 🪙</span>
             </div>` : ''}
         </div>
     </div>`;
@@ -781,9 +798,10 @@ function updateCalcTotal() {
     ALL_ITEMS.forEach(item => {
         const qty = quantities[item.name] || 0;
         if (qty <= 0) return;
-        const cost = item.hasDiscount && discount > 0
-            ? item.cost * (1 - discount/100)
-            : item.cost;
+        const craftCost = calcCraftCost(item);
+        const cost = (item.hasDiscount && discount > 0 && craftCost > 0)
+            ? craftCost * (1 - discount / 100)
+            : (craftCost > 0 ? craftCost : item.cost);
         total += cost * qty;
     });
     document.getElementById('calc-total').textContent = fmt(total) + ' 🪙';
@@ -799,8 +817,8 @@ function filtered() {
         (!activeCategory || item.cat === activeCategory) &&
         (!searchQuery || item.name.toLowerCase().includes(searchQuery))
     );
-    if (sortOrder === 'asc')  items = items.sort((a,b) => a.cost - b.cost);
-    if (sortOrder === 'desc') items = items.sort((a,b) => b.cost - a.cost);
+    if (sortOrder === 'asc')  items = items.sort((a,b) => calcCraftCost(a) - calcCraftCost(b));
+    if (sortOrder === 'desc') items = items.sort((a,b) => calcCraftCost(b) - calcCraftCost(a));
     return items;
 }
 
@@ -818,38 +836,42 @@ function renderCard(item) {
         return `<div class="res-item" title="${meta.label}"><span class="res-emoji">${meta.emoji}</span><span class="res-label">${meta.label}</span><span class="res-value">${v.toLocaleString('ru-RU')}</span></div>`;
     }).join('');
 
-    // Блок цен
-    const baseCost  = item.cost;
-    const discCost  = item.hasDiscount && discount > 0 ? baseCost * (1 - discount/100) : null;
+    // ===== БЛОК ЦЕН: КРАФТ / БИРЖА / ДОХОД =====
+    const craftCostRaw  = calcCraftCost(item);
+    const craftCostDisc = (item.hasDiscount && discount > 0 && craftCostRaw > 0)
+        ? craftCostRaw * (1 - discount / 100)
+        : craftCostRaw;
+    const marketPrice   = item.market_price || 0;
+    const income        = (marketPrice > 0 && craftCostDisc > 0) ? marketPrice - craftCostDisc : null;
+
     const timeBadge = item.time > 0 ? `<span class="badge badge-type">⏱ ${item.time} мин</span>` : '';
     const discBadge = item.hasDiscount ? `<span class="badge" style="background:rgba(74,222,128,0.1);color:#4ade80;border:1px solid rgba(74,222,128,0.25)">🏷️ Скидка</span>` : '';
 
     let pricesHTML = '';
-    if (baseCost) {
-        if (discCost !== null) {
-            pricesHTML = `<div class="craft-prices-row">
-                <div class="price-cell">
-                    <span class="price-cell-label">Себест.</span>
-                    <span class="price-cell-value cost" style="text-decoration:line-through;opacity:.45">${fmt(baseCost)} 🪙</span>
-                </div>
-                <div class="price-cell">
-                    <span class="price-cell-label">−${discount}%</span>
-                    <span class="price-cell-value saving">${fmt(discCost)} 🪙</span>
-                </div>
-            </div>`;
-        } else {
-            pricesHTML = `<div class="craft-prices-row">
-                <div class="price-cell">
-                    <span class="price-cell-label">Себест.</span>
-                    <span class="price-cell-value cost">${fmt(baseCost)} 🪙</span>
-                </div>
-            </div>`;
-        }
+    if (craftCostDisc > 0 || marketPrice > 0) {
+        const incomeColor = income === null ? '' : (income >= 0 ? '#4ade80' : '#f87171');
+        const incomeSign  = income !== null ? (income >= 0 ? '+' : '') : '';
+
+        pricesHTML = `<div class="craft-prices-row">
+            ${craftCostDisc > 0 ? `<div class="price-cell">
+                <span class="price-cell-label">Крафт</span>
+                <span class="price-cell-value cost">${fmt(craftCostDisc)} 🪙</span>
+            </div>` : ''}
+            ${marketPrice > 0 ? `<div class="price-cell">
+                <span class="price-cell-label">Биржа</span>
+                <span class="price-cell-value cost">${fmt(marketPrice)} 🪙</span>
+            </div>` : ''}
+            ${income !== null ? `<div class="price-cell">
+                <span class="price-cell-label">Доход</span>
+                <span class="price-cell-value" style="color:${incomeColor}">${incomeSign}${fmt(income)} 🪙</span>
+            </div>` : ''}
+        </div>`;
     }
 
     // Footer: итог количества
+    const effectiveCost = craftCostDisc > 0 ? craftCostDisc : item.cost;
     const lineTotal = qty > 0
-        ? `<span class="total-sum">×${qty} = <span>${fmt((discCost ?? baseCost) * qty)} 🪙</span></span>`
+        ? `<span class="total-sum">×${qty} = <span>${fmt(effectiveCost * qty)} 🪙</span></span>`
         : '<span style="font-size:11px;color:var(--text-muted)">Кол-во</span>';
 
     return `<div class="craft-card${expanded}${favClass}" data-name="${item.name.replace(/"/g,'&quot;')}">
@@ -885,8 +907,11 @@ function render() {
     // Экономия
     const savEl = document.getElementById('total-saving');
     if (discount > 0) {
-        const saving = items.filter(i => i.hasDiscount && i.cost)
-            .reduce((s, i) => s + i.cost * (discount/100), 0);
+        const saving = items.filter(i => i.hasDiscount)
+            .reduce((s, i) => {
+                const c = calcCraftCost(i);
+                return s + (c > 0 ? c * (discount / 100) : 0);
+            }, 0);
         if (saving > 0) {
             savEl.style.display = 'block';
             document.getElementById('saving-val').textContent = `−${fmt(saving)} 🪙`;
@@ -922,7 +947,6 @@ function toggleExpand(name) {
     } else {
         expandedCards.add(name);
     }
-    // Перерисовываем только карточку
     const item = ALL_ITEMS.find(i => i.name === name);
     if (!item) return;
     const card = document.querySelector(`.craft-card[data-name="${name.replace(/"/g,'&quot;')}"]`);
@@ -947,7 +971,6 @@ function toggleFav(name, e) {
 function changeQty(name, delta, e) {
     e && e.stopPropagation();
     quantities[name] = Math.max(0, (quantities[name] || 0) + delta);
-    // Обновляем footer и expand без полного ре-рендера
     refreshCardFooter(name);
     updateCalcTotal();
 }
@@ -965,21 +988,22 @@ function refreshCardFooter(name) {
     const card = document.querySelector(`.craft-card[data-name="${name.replace(/"/g,'&quot;')}"]`);
     if (!card) return;
 
-    const qty     = quantities[name] || 0;
-    const discCost = item.hasDiscount && discount > 0 ? item.cost * (1 - discount/100) : null;
+    const qty           = quantities[name] || 0;
+    const craftCostRaw  = calcCraftCost(item);
+    const effectiveCost = (item.hasDiscount && discount > 0 && craftCostRaw > 0)
+        ? craftCostRaw * (1 - discount / 100)
+        : (craftCostRaw > 0 ? craftCostRaw : item.cost);
 
     // Обновить input
     const inp = card.querySelector('.quantity-control input');
     if (inp) inp.value = qty;
 
     // Обновить итог
-    const sumEl = card.querySelector('.total-sum');
-    const noEl  = card.querySelector('.craft-footer > span:last-child');
     const footer = card.querySelector('.craft-footer');
     if (footer) {
         const lastEl = footer.lastElementChild;
         if (qty > 0) {
-            const total = fmt((discCost ?? item.cost) * qty);
+            const total = fmt(effectiveCost * qty);
             if (lastEl && lastEl.classList.contains('total-sum')) {
                 lastEl.innerHTML = `×${qty} = <span>${total} 🪙</span>`;
             } else {
@@ -1023,11 +1047,12 @@ function dbRowToItem(row, catName) {
     const res = {};
     DB_RES_COLS.forEach(col => { if (row[col] > 0) res[col] = row[col]; });
     return {
-        cat:         catName,
-        name:        row.name,
-        cost:        row.craft_cost ?? 0,
-        hasDiscount: row.discount > 0,
-        time:        row.craft_time ?? 0,
+        cat:          catName,
+        name:         row.name,
+        cost:         row.craft_cost ?? 0,
+        market_price: row.market_price ?? 0,
+        hasDiscount:  row.discount > 0,
+        time:         row.craft_time ?? 0,
         res,
     };
 }
@@ -1046,52 +1071,52 @@ async function loadFromSupabase() {
 }
 
 const LOCAL_DATA = [
-    { cat:'Мастерские',name:'Балка',cost:340,hasDiscount:true,time:5,res:{wood:100,iron:5,copper:4}},
-    { cat:'Мастерские',name:'Бронза',cost:608,hasDiscount:true,time:6,res:{iron:20,copper:10,coal:1}},
-    { cat:'Мастерские',name:'Пластина',cost:776,hasDiscount:true,time:6,res:{iron:30,coal:15,cloth:4}},
-    { cat:'Мастерские',name:'Парусина',cost:61,hasDiscount:true,time:3,res:{coal:1,cloth:10}},
-    { cat:'Мастерские',name:'Переборка',cost:1289,hasDiscount:true,time:5,res:{iron:70,coal:1}},
-    { cat:'Переработка',name:'Железо',cost:88,hasDiscount:false,time:1,res:{iron_ore:10}},
-    { cat:'Переработка',name:'Медь',cost:24,hasDiscount:false,time:2,res:{copper_ore:1}},
-    { cat:'Переработка',name:'Уголь',cost:8,hasDiscount:false,time:1,res:{debris:2}},
-    { cat:'Переработка',name:'Свежее мясо',cost:12,hasDiscount:false,time:1,res:{animals:1}},
-    { cat:'Переработка',name:'50 Ткани + 1 Кожа',cost:120,hasDiscount:false,time:20,res:{animals:10}},
-    { cat:'Разное',name:'Сундук',cost:500,hasDiscount:false,time:1,res:{gold:500}},
-    { cat:'Разное',name:'Имперский чертеж',cost:2800000,hasDiscount:false,time:200,res:{gold:100000,blueprint_frag:100}},
-    { cat:'Разное',name:'Порцион',cost:71,hasDiscount:false,time:2,res:{rum:1,supplies:2,fresh_meat:3}},
-    { cat:'Разное',name:'Снасти',cost:30,hasDiscount:false,time:1,res:{wood:5,iron:1}},
-    { cat:'Разное',name:'Чугунные ядра',cost:144,hasDiscount:false,time:1,res:{iron:8}},
-    { cat:'Разное',name:'Брандскугели',cost:120,hasDiscount:false,time:1,res:{iron:5,battle_mark:2}},
-    { cat:'Разное',name:'Бомбы осколочные',cost:114,hasDiscount:false,time:1,res:{iron:5,copper:1}},
-    { cat:'Разное',name:'Малые поджигающие бочки',cost:400,hasDiscount:false,time:1,res:{wood:100,whale_oil:10}},
-    { cat:'Разное',name:'Большие осколочные мины',cost:4180,hasDiscount:false,time:1,res:{wood:200,animals:20}},
-    { cat:'Расходные предметы',name:'Деревяные заплатки',cost:25,hasDiscount:false,time:0,res:{wood:10}},
-    { cat:'Расходные предметы',name:'Железные заплатки',cost:540,hasDiscount:false,time:0,res:{iron:30}},
-    { cat:'Расходные предметы',name:'Бронзовые заплатки',cost:474,hasDiscount:false,time:0,res:{bronze:1}},
-    { cat:'Расходные предметы',name:'Заплатки из обломков',cost:600,hasDiscount:false,time:0,res:{debris:25,battle_mark:1}},
-    { cat:'Расходные предметы',name:'Деревянные ремонт-набор',cost:51,hasDiscount:false,time:0,res:{wood:10,cloth:8}},
-    { cat:'Расходные предметы',name:'Железные ремонт-набор',cost:492,hasDiscount:false,time:0,res:{iron:22,cloth:30}},
-    { cat:'Расходные предметы',name:'Бронзовый ремонт-набор',cost:540,hasDiscount:false,time:0,res:{bronze:1,sail:1}},
-    { cat:'Расходные предметы',name:'Походный рацион',cost:160,hasDiscount:false,time:0,res:{gold:100,rum:10}},
-    { cat:'Расходные предметы',name:'Малые добавочные паруса',cost:40,hasDiscount:false,time:0,res:{gold:40}},
-    { cat:'Расходные предметы',name:'Большие добавочные паруса',cost:133,hasDiscount:false,time:0,res:{sail:2}},
-    { cat:'Расходные предметы',name:'Малые пластины',cost:540,hasDiscount:false,time:0,res:{iron:30}},
-    { cat:'Расходные предметы',name:'Большие пластины',cost:3217,hasDiscount:false,time:0,res:{plate_res:1,battle_mark:5}},
-    { cat:'Расходные предметы',name:'Дымовая бомба',cost:5000,hasDiscount:false,time:0,res:{battle_mark:10}},
-    { cat:'Расходные предметы',name:'Дымовая завеса',cost:5720,hasDiscount:false,time:0,res:{iron:40,battle_mark:10}},
-    { cat:'Расходные предметы',name:'Подкуп',cost:10000,hasDiscount:false,time:0,res:{voodoo_skull:1}},
-    { cat:'Расходные предметы',name:'Черные двойной порох',cost:60,hasDiscount:false,time:0,res:{gold:60}},
-    { cat:'Расходные предметы',name:'Красный двойной порох',cost:60,hasDiscount:false,time:0,res:{gold:60}},
-    { cat:'Расходные предметы',name:'Белый двойной порох',cost:60,hasDiscount:false,time:0,res:{gold:60}},
-    { cat:'Расходные предметы',name:'Ром-паёк',cost:120,hasDiscount:false,time:0,res:{rum:20}},
-    { cat:'Расходные предметы',name:'Сытный паёк',cost:400,hasDiscount:false,time:0,res:{fish:20,fresh_meat:40}},
-    { cat:'Расходные предметы',name:'Фосфор',cost:2150,hasDiscount:false,time:0,res:{gold:150,battle_mark:4}},
-    { cat:'Расходные предметы',name:'Пороховой заряд',cost:2150,hasDiscount:false,time:0,res:{gold:150,battle_mark:4}},
-    { cat:'Расходные предметы',name:'Крюк Посейдона',cost:15000,hasDiscount:false,time:0,res:{gold:5000,voodoo_skull:1}},
-    { cat:'Расходные предметы',name:'Сигнальная ракета Синяя',cost:130,hasDiscount:false,time:0,res:{gold:130}},
-    { cat:'Расходные предметы',name:'Сигнальная ракета Красная',cost:200,hasDiscount:false,time:0,res:{gold:200}},
-    { cat:'Расходные предметы',name:'Сигнальная ракета Желтая',cost:5000,hasDiscount:false,time:0,res:{battle_mark:10}},
-    { cat:'Расходные предметы',name:'Горн',cost:10000,hasDiscount:false,time:0,res:{voodoo_skull:1}},
+    { cat:'Мастерские',name:'Балка',cost:340,market_price:0,hasDiscount:true,time:5,res:{wood:100,iron:5,copper:4}},
+    { cat:'Мастерские',name:'Бронза',cost:608,market_price:0,hasDiscount:true,time:6,res:{iron:20,copper:10,coal:1}},
+    { cat:'Мастерские',name:'Пластина',cost:776,market_price:0,hasDiscount:true,time:6,res:{iron:30,coal:15,cloth:4}},
+    { cat:'Мастерские',name:'Парусина',cost:61,market_price:0,hasDiscount:true,time:3,res:{coal:1,cloth:10}},
+    { cat:'Мастерские',name:'Переборка',cost:1289,market_price:0,hasDiscount:true,time:5,res:{iron:70,coal:1}},
+    { cat:'Переработка',name:'Железо',cost:88,market_price:0,hasDiscount:false,time:1,res:{iron_ore:10}},
+    { cat:'Переработка',name:'Медь',cost:24,market_price:0,hasDiscount:false,time:2,res:{copper_ore:1}},
+    { cat:'Переработка',name:'Уголь',cost:8,market_price:0,hasDiscount:false,time:1,res:{debris:2}},
+    { cat:'Переработка',name:'Свежее мясо',cost:12,market_price:0,hasDiscount:false,time:1,res:{animals:1}},
+    { cat:'Переработка',name:'50 Ткани + 1 Кожа',cost:120,market_price:0,hasDiscount:false,time:20,res:{animals:10}},
+    { cat:'Разное',name:'Сундук',cost:500,market_price:0,hasDiscount:false,time:1,res:{gold:500}},
+    { cat:'Разное',name:'Имперский чертеж',cost:2800000,market_price:0,hasDiscount:false,time:200,res:{gold:100000,blueprint_frag:100}},
+    { cat:'Разное',name:'Порцион',cost:71,market_price:0,hasDiscount:false,time:2,res:{rum:1,supplies:2,fresh_meat:3}},
+    { cat:'Разное',name:'Снасти',cost:30,market_price:0,hasDiscount:false,time:1,res:{wood:5,iron:1}},
+    { cat:'Разное',name:'Чугунные ядра',cost:144,market_price:0,hasDiscount:false,time:1,res:{iron:8}},
+    { cat:'Разное',name:'Брандскугели',cost:120,market_price:0,hasDiscount:false,time:1,res:{iron:5,battle_mark:2}},
+    { cat:'Разное',name:'Бомбы осколочные',cost:114,market_price:0,hasDiscount:false,time:1,res:{iron:5,copper:1}},
+    { cat:'Разное',name:'Малые поджигающие бочки',cost:400,market_price:0,hasDiscount:false,time:1,res:{wood:100,whale_oil:10}},
+    { cat:'Разное',name:'Большие осколочные мины',cost:4180,market_price:0,hasDiscount:false,time:1,res:{wood:200,animals:20}},
+    { cat:'Расходные предметы',name:'Деревяные заплатки',cost:25,market_price:0,hasDiscount:false,time:0,res:{wood:10}},
+    { cat:'Расходные предметы',name:'Железные заплатки',cost:540,market_price:0,hasDiscount:false,time:0,res:{iron:30}},
+    { cat:'Расходные предметы',name:'Бронзовые заплатки',cost:474,market_price:0,hasDiscount:false,time:0,res:{bronze:1}},
+    { cat:'Расходные предметы',name:'Заплатки из обломков',cost:600,market_price:0,hasDiscount:false,time:0,res:{debris:25,battle_mark:1}},
+    { cat:'Расходные предметы',name:'Деревянные ремонт-набор',cost:51,market_price:0,hasDiscount:false,time:0,res:{wood:10,cloth:8}},
+    { cat:'Расходные предметы',name:'Железные ремонт-набор',cost:492,market_price:0,hasDiscount:false,time:0,res:{iron:22,cloth:30}},
+    { cat:'Расходные предметы',name:'Бронзовый ремонт-набор',cost:540,market_price:0,hasDiscount:false,time:0,res:{bronze:1,sail:1}},
+    { cat:'Расходные предметы',name:'Походный рацион',cost:160,market_price:0,hasDiscount:false,time:0,res:{gold:100,rum:10}},
+    { cat:'Расходные предметы',name:'Малые добавочные паруса',cost:40,market_price:0,hasDiscount:false,time:0,res:{gold:40}},
+    { cat:'Расходные предметы',name:'Большие добавочные паруса',cost:133,market_price:0,hasDiscount:false,time:0,res:{sail:2}},
+    { cat:'Расходные предметы',name:'Малые пластины',cost:540,market_price:0,hasDiscount:false,time:0,res:{iron:30}},
+    { cat:'Расходные предметы',name:'Большие пластины',cost:3217,market_price:0,hasDiscount:false,time:0,res:{plate_res:1,battle_mark:5}},
+    { cat:'Расходные предметы',name:'Дымовая бомба',cost:5000,market_price:0,hasDiscount:false,time:0,res:{battle_mark:10}},
+    { cat:'Расходные предметы',name:'Дымовая завеса',cost:5720,market_price:0,hasDiscount:false,time:0,res:{iron:40,battle_mark:10}},
+    { cat:'Расходные предметы',name:'Подкуп',cost:10000,market_price:0,hasDiscount:false,time:0,res:{voodoo_skull:1}},
+    { cat:'Расходные предметы',name:'Черные двойной порох',cost:60,market_price:0,hasDiscount:false,time:0,res:{gold:60}},
+    { cat:'Расходные предметы',name:'Красный двойной порох',cost:60,market_price:0,hasDiscount:false,time:0,res:{gold:60}},
+    { cat:'Расходные предметы',name:'Белый двойной порох',cost:60,market_price:0,hasDiscount:false,time:0,res:{gold:60}},
+    { cat:'Расходные предметы',name:'Ром-паёк',cost:120,market_price:0,hasDiscount:false,time:0,res:{rum:20}},
+    { cat:'Расходные предметы',name:'Сытный паёк',cost:400,market_price:0,hasDiscount:false,time:0,res:{fish:20,fresh_meat:40}},
+    { cat:'Расходные предметы',name:'Фосфор',cost:2150,market_price:0,hasDiscount:false,time:0,res:{gold:150,battle_mark:4}},
+    { cat:'Расходные предметы',name:'Пороховой заряд',cost:2150,market_price:0,hasDiscount:false,time:0,res:{gold:150,battle_mark:4}},
+    { cat:'Расходные предметы',name:'Крюк Посейдона',cost:15000,market_price:0,hasDiscount:false,time:0,res:{gold:5000,voodoo_skull:1}},
+    { cat:'Расходные предметы',name:'Сигнальная ракета Синяя',cost:130,market_price:0,hasDiscount:false,time:0,res:{gold:130}},
+    { cat:'Расходные предметы',name:'Сигнальная ракета Красная',cost:200,market_price:0,hasDiscount:false,time:0,res:{gold:200}},
+    { cat:'Расходные предметы',name:'Сигнальная ракета Желтая',cost:5000,market_price:0,hasDiscount:false,time:0,res:{battle_mark:10}},
+    { cat:'Расходные предметы',name:'Горн',cost:10000,market_price:0,hasDiscount:false,time:0,res:{voodoo_skull:1}},
 ];
 
 // ===== ИНИЦИАЛИЗАЦИЯ =====
@@ -1146,7 +1171,7 @@ async function init() {
     });
     document.getElementById('sort-asc').addEventListener('click', function() {
         sortOrder = sortOrder === 'asc' ? null : 'asc';
-        this.classList.toggle('active', sortOrder === 'asc');
+        this.classList.toggle('active', sortOrder === 'asc')
         document.getElementById('sort-desc').classList.remove('active');
         render();
     });
