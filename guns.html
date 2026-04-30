@@ -52,11 +52,11 @@
             padding: 10px 16px;
         }
 
-        /* Шапка: только название */
+        /* Шапка: название + цены в одну строку */
         .gun-header {
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 12px;
             margin-bottom: 8px;
         }
 
@@ -64,17 +64,21 @@
             font-size: 14px;
             font-weight: 600;
             color: #e8f4ff;
+            white-space: nowrap;
+            flex-shrink: 0;
         }
 
         /* ======================================
            БЛОК ЦЕН — три колонки с подписями
+           Встроен в .gun-header, растягивается
            ====================================== */
         .gun-prices-row {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
             gap: 6px;
-            margin-bottom: 10px;
-            padding: 8px 10px;
+            flex: 1;
+            min-width: 0;
+            padding: 5px 10px;
             background: rgba(0, 0, 0, 0.18);
             border-radius: 8px;
             border: 1px solid var(--border);
@@ -83,7 +87,7 @@
         .price-cell {
             display: flex;
             flex-direction: column;
-            gap: 3px;
+            gap: 2px;
         }
 
         /* Разделители между колонками */
@@ -611,15 +615,15 @@
                 </div>` : '';
 
                 const isFav = favorites[g.name];
-                const favBtn = `<button class="fav-btn" data-name="${g.name}" style="color:${isFav ? 'var(--gold)' : 'var(--text-muted)'}">${isFav ? '★' : '☆'}</button>`;
+                const favBtn = `<button class="fav-btn" data-name="${g.name}" style="color:${isFav ? 'var(--gold)' : 'var(--text-muted)'}"> ${isFav ? '★' : '☆'}</button>`;
 
                 return `<div class="gun-card${isFav ? ' favorited' : ''}" data-name="${g.name}" data-price="${g.market_price || 0}">
                     <div class="gun-icon">${iconHtml}</div>
                     <div class="gun-info">
                         <div class="gun-header">
                             <div class="gun-name">${g.name}${g.qty > 1 ? ` <span style="color:var(--text-muted);font-size:12px">×${g.qty}</span>` : ''}</div>
+                            ${buildPriceRow(g)}
                         </div>
-                        ${buildPriceRow(g)}
                         <div class="res-title">Ресурсы для крафта</div>
                         <div class="res-grid">${res || '<span style="color:var(--text-muted);font-size:11px">нет ресурсов</span>'}</div>
                     </div>
