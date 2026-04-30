@@ -94,6 +94,25 @@
             font-weight: 700;
         }
 
+        /* Бейдж прибыли */
+        .profit-badge {
+            font-size: 11px;
+            font-weight: 700;
+            padding: 2px 6px;
+            border-radius: 4px;
+            white-space: nowrap;
+        }
+        .profit-badge.positive {
+            color: #4ade80;
+            background: rgba(74, 222, 128, 0.12);
+            border: 1px solid rgba(74, 222, 128, 0.25);
+        }
+        .profit-badge.negative {
+            color: #f87171;
+            background: rgba(248, 113, 113, 0.12);
+            border: 1px solid rgba(248, 113, 113, 0.25);
+        }
+
         .res-title {
             font-size: 10px;
             color: var(--text-muted);
@@ -234,6 +253,7 @@
             display: flex;
             align-items: center;
             gap: 12px;
+            flex-wrap: wrap;
         }
 
         .profit-calculator-label {
@@ -390,9 +410,10 @@
             </div>
             <div class="profit-calculator" id="profit-calculator">
                 <div class="profit-calculator-label">
-                    <span>💰</span> Сумма:
+                    <span id="calc-mode-icon">💰</span> <span id="calc-mode-text">Выручка</span>:
                 </div>
                 <div class="profit-calculator-value" id="profit-total">0 🪙</div>
+                <button class="sort-btn" id="calc-mode-toggle" title="Переключить режим">≈ Прибыль</button>
                 <button class="profit-clear-btn" id="profit-clear">Очистить</button>
             </div>
         </div>
@@ -444,6 +465,7 @@
         let searchQuery = '';
         let priceMin = 0;
         let sortOrder = null;
+        let calcMode = 'revenue'; // 'revenue' | 'profit'
         let quantities = JSON.parse(localStorage.getItem('wosb_gun_quantities') || '{}');
         let favorites = JSON.parse(localStorage.getItem('wosb_gun_favorites') || '{}');
 
@@ -464,12 +486,16 @@
             let total = 0;
             ALL_GUNS.forEach(g => {
                 const qty = quantities[g.name] || 0;
-                const price = g.market_price || 0;
-                if (qty > 0 && price > 0) {
-                    total += price * qty;
+                if (qty <= 0) return;
+                if (calcMode === 'profit') {
+                    // прибыль считаем только если есть и цена биржи, и себестоимость
+                    if (g.profit !== null) total += g.profit * qty;
+                } else {
+                    if (g.market_price > 0) total += g.market_price * qty;
                 }
             });
-            document.getElementById('profit-total').textContent = total.toLocaleString('ru-RU') + ' 🪙';
+            const el = document.getElementById('profit-total');
+            if (el) el.textContent = total.toLocaleString('ru-RU') + ' 🪙';
         }
 
         function clearAllQuantities() {
@@ -483,7 +509,11 @@
         function dbToGun(row) {
             const res = {};
             GUN_RES_COLS.forEach(c => { if (row[c] > 0) res[c] = row[c]; });
-            return { name: row.name, type: row.type, qty: row.qty || 1, cost: row.craft_cost || 0, res, market_price: row.market_price || 0 };
+            const cost = row.craft_cost || 0;
+            const market = row.market_price || 0;
+            // прибыль есть только когда знаем и цену биржи, и себестоимость крафта
+            const profit = (cost > 0 && market > 0) ? market - cost : null;
+            return { name: row.name, type: row.type, qty: row.qty || 1, cost, res, market_price: market, profit };
         }
 
         async function loadGuns() {
@@ -496,7 +526,9 @@
             return GUNS.map(g => {
                 const res = {};
                 GUN_RES_COLS.forEach(k => { if (g[k] > 0) res[k] = g[k]; });
-                return { name: g.name, type: g.type, qty: g.qty || 1, cost: g.cost || 0, res };
+                const cost = g.cost || 0;
+                const market = 0; // локальные данные не знают рыночную цену
+                return { name: g.name, type: g.type, qty: g.qty || 1, cost, res, market_price: market, profit: null };
             });
         }
 
@@ -548,6 +580,11 @@ function render() {
                     ? `<div style="color:#4ade80;font-size:12px;font-weight:700">${Number(g.market_price).toLocaleString('ru-RU')} 🪙</div>`
                     : `<div style="color:var(--text-muted);font-size:11px;font-style:italic">n/a</div>`;
 
+                // Бейдж прибыли: показываем только когда есть и цена биржи, и себестоимость
+                const profitBadge = g.profit !== null
+                    ? `<div class="profit-badge ${g.profit >= 0 ? 'positive' : 'negative'}">${g.profit >= 0 ? '+' : ''}${Math.round(g.profit).toLocaleString('ru-RU')} 🪙</div>`
+                    : '';
+
                 const iconHtml = g.img
                     ? `<img src="resources/${g.img}" alt="${g.name}">`
                     : GUN_TYPE_ICONS[g.type] || '💥';
@@ -574,6 +611,7 @@ function render() {
                             <div class="gun-prices">
                                 <div>${craftCost}</div>
                                 <div style="margin-top:4px">${marketPrice}</div>
+                                ${profitBadge ? `<div style="margin-top:4px">${profitBadge}</div>` : ''}
                             </div>
                         </div>
                         <div class="res-title">Ресурсы для крафт</div>
@@ -761,6 +799,30 @@ function render() {
             });
 
             document.getElementById('profit-clear').addEventListener('click', clearAllQuantities);
+
+            // Переключатель режима калькулятора: Выручка ↔ Прибыль
+            document.getElementById('calc-mode-toggle').addEventListener('click', function() {
+                calcMode = calcMode === 'revenue' ? 'profit' : 'revenue';
+                const icon = document.getElementById('calc-mode-icon');
+                const text = document.getElementById('calc-mode-text');
+                const calc = document.getElementById('profit-calculator');
+                if (calcMode === 'profit') {
+                    icon.textContent = '📈';
+                    text.textContent = 'Прибыль';
+                    this.textContent = '≈ Выручка';
+                    this.classList.add('active');
+                    calc.style.borderColor = 'rgba(74, 222, 128, 0.5)';
+                    calc.style.background = 'linear-gradient(135deg, rgba(74, 222, 128, 0.14), rgba(74, 222, 128, 0.06))';
+                } else {
+                    icon.textContent = '💰';
+                    text.textContent = 'Выручка';
+                    this.textContent = '≈ Прибыль';
+                    this.classList.remove('active');
+                    calc.style.borderColor = 'rgba(74, 222, 128, 0.25)';
+                    calc.style.background = 'linear-gradient(135deg, rgba(74, 222, 128, 0.08), rgba(201, 162, 39, 0.08))';
+                }
+                updateProfitTotal();
+            });
 
             render();
             attachCardEvents();
