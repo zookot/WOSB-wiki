@@ -52,10 +52,11 @@
             padding: 10px 16px;
         }
 
-        /* Шапка: название + цены в одну строку */
+        /* Шапка: название слева, цены прижаты вправо */
         .gun-header {
             display: flex;
             align-items: center;
+            justify-content: space-between;
             gap: 12px;
             margin-bottom: 8px;
         }
@@ -69,16 +70,13 @@
         }
 
         /* ======================================
-           БЛОК ЦЕН — три колонки с подписями
-           Встроен в .gun-header, растягивается
+           БЛОК ЦЕН — компактный, прижат вправо
            ====================================== */
         .gun-prices-row {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 6px;
-            flex: 1;
-            min-width: 0;
-            padding: 5px 10px;
+            display: flex;
+            align-items: center;
+            flex-shrink: 0;
+            padding: 4px 0;
             background: rgba(0, 0, 0, 0.18);
             border-radius: 8px;
             border: 1px solid var(--border);
@@ -87,26 +85,27 @@
         .price-cell {
             display: flex;
             flex-direction: column;
-            gap: 2px;
+            align-items: flex-end;
+            gap: 1px;
+            padding: 2px 12px;
         }
 
         /* Разделители между колонками */
         .price-cell + .price-cell {
             border-left: 1px solid var(--border);
-            padding-left: 10px;
         }
 
         .price-cell-label {
-            font-size: 9px;
+            font-size: 8px;
             text-transform: uppercase;
-            letter-spacing: 0.6px;
+            letter-spacing: 0.5px;
             color: var(--text-muted);
             font-weight: 600;
             white-space: nowrap;
         }
 
         .price-cell-value {
-            font-size: 13px;
+            font-size: 12px;
             font-weight: 700;
             white-space: nowrap;
         }
@@ -115,7 +114,7 @@
         .price-cell-value.market  { color: #4ade80; }
         .price-cell-value.income  { color: #4ade80; }
         .price-cell-value.loss    { color: #f87171; }
-        .price-cell-value.na      { color: var(--text-muted); font-style: italic; font-size: 11px; }
+        .price-cell-value.na      { color: var(--text-muted); font-style: italic; font-size: 10px; }
 
         /* ====================================== */
 
@@ -540,7 +539,7 @@
             // --- Колонка 1: Себестоимость крафта ---
             let costHtml;
             if (g.res.pirate_token > 0) {
-                costHtml = `<div class="price-cell-value na">Жетоны пиратов</div>`;
+                costHtml = `<div class="price-cell-value na">Жетоны</div>`;
             } else if (g.cost > 0) {
                 costHtml = `<div class="price-cell-value cost">${g.cost.toLocaleString('ru-RU')} 🪙</div>`;
             } else {
@@ -550,7 +549,7 @@
             // --- Колонка 2: Цена на Бирже ---
             const marketHtml = g.market_price > 0
                 ? `<div class="price-cell-value market">${Number(g.market_price).toLocaleString('ru-RU')} 🪙</div>`
-                : `<div class="price-cell-value na">Нет данных</div>`;
+                : `<div class="price-cell-value na">—</div>`;
 
             // --- Колонка 3: Доход / Убыток ---
             let profitHtml;
@@ -565,7 +564,7 @@
 
             return `<div class="gun-prices-row">
                 <div class="price-cell">
-                    <div class="price-cell-label">Себестоимость крафта</div>
+                    <div class="price-cell-label">Себест. крафта</div>
                     ${costHtml}
                 </div>
                 <div class="price-cell">
