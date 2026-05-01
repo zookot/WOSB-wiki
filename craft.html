@@ -180,7 +180,7 @@
         }
 
         .quantity-control input {
-            width: 34px;
+            width: 60px;
             background: rgba(255,255,255,0.05);
             border: none;
             color: var(--gold-light);
@@ -553,10 +553,20 @@
                 <div class="btn-group" id="cat-filters"></div>
             </div>
             <div class="filter-group">
+                <div class="filter-label">📊 Окупаемость</div>
+                <div class="sort-buttons" id="roi-filters">
+                    <button class="sort-btn active" id="roi-all" title="Все предметы">Все</button>
+                    <button class="sort-btn" id="roi-profit" title="Окупаемые (ROI > 0)">Окупаемые</button>
+                    <button class="sort-btn" id="roi-loss" title="Убыточные (ROI < 0)">Убыточные</button>
+                </div>
+            </div>
+            <div class="filter-group">
                 <div class="filter-label">↕ Сортировка</div>
                 <div class="sort-buttons">
                     <button class="sort-btn" id="sort-desc">↓ Дорогие</button>
                     <button class="sort-btn" id="sort-asc">↑ Дешёвые</button>
+                    <button class="sort-btn" id="sort-roi-desc">↓ ROI</button>
+                    <button class="sort-btn" id="sort-roi-asc">↑ ROI</button>
                 </div>
             </div>
             <button class="btn-reset" id="btn-reset">↺ Сбросить</button>
@@ -663,8 +673,10 @@ let expandedCards = new Set();
 
 let activeCategory = null;
 let searchQuery    = '';
-let sortOrder      = null;
+let sortOrder      = null; // 'asc' | 'desc' | null
+let sortOrderRoi   = null; // 'roi-asc' | 'roi-desc' | null
 let discount       = 0;
+let roiFilter      = 'all'; // 'all' | 'profit' | 'loss'
 
 // ===== ЦЕНЫ РЕСУРСОВ =====
 // is_base=true  → берём cost_avg  (базовый ресурс, цена биржи)
@@ -678,10 +690,14 @@ function getUnitPrice(col) {
 }
 
 // ===== СЕБЕСТОИМОСТЬ КРАФТА ИЗ РЕСУРСОВ =====
-function calcCraftCost(item) {
+function calcCraftCost(item, disc) {
+    const effectiveDisc = item.hasDiscount ? disc : 0;
     return Object.entries(item.res || {})
         .filter(([, v]) => v > 0)
-        .reduce((sum, [col, amt]) => sum + amt * getUnitPrice(col), 0);
+        .reduce((sum, [col, amt]) => {
+            const effectiveAmt = effectiveDisc > 0 ? Math.floor(amt * (1 - effectiveDisc / 100)) : amt;
+            return sum + effectiveAmt * getUnitPrice(col);
+        }, 0);
 }
 
 // ===== ТАБЛИЦА СЕБЕСТОИМОСТИ =====
@@ -699,12 +715,14 @@ function buildExpandHTML(item, qty) {
     }
 
     let totalCost = 0;
+    const effectiveDisc = item.hasDiscount ? discount : 0;
     const rows = craftEntries.map(([col, amount]) => {
+        const effectiveAmt = effectiveDisc > 0 ? Math.floor(amount * (1 - effectiveDisc / 100)) : amount;
         const unitPrice  = getUnitPrice(col);
-        const totalAmt   = amount * effectiveQty;
+        const totalAmt   = effectiveAmt * effectiveQty;
         const totalPrice = totalAmt * unitPrice;
         totalCost += totalPrice;
-        return { col, amount, totalAmt, unitPrice, totalPrice };
+        return { col, amount, effectiveAmt, totalAmt, unitPrice, totalPrice };
     });
     rows.forEach(r => r.share = totalCost > 0 ? r.totalPrice / totalCost * 100 : 0);
 
@@ -730,35 +748,45 @@ function buildExpandHTML(item, qty) {
     const totalStr    = totalCost > 0 ? Math.round(totalCost).toLocaleString('ru-RU') + ' 🪙' : '—';
     const titleSuffix = totalCost > 0 ? ` (${Math.round(totalCost).toLocaleString('ru-RU')} 🪙)` : '';
 
-    // Финансовый блок
-    const craftCostDisc = item.hasDiscount && discount > 0
-        ? totalCost * (1 - discount / 100)
-        : totalCost;
-    const marketPrice   = item.market_price || 0;
-    const income        = (marketPrice > 0 && craftCostDisc > 0) ? marketPrice - craftCostDisc : null;
-    const saving        = (item.hasDiscount && discount > 0 && totalCost > 0) ? totalCost - craftCostDisc : null;
+    // Финансовый блок (totalCost уже со скидкой, посчитан выше)
+    const totalCostNoDisc = calcCraftCost(item, 0) * effectiveQty;
+    const birzhaTotal     = (item.cost || 0) * effectiveQty;
+    const diff            = (birzhaTotal > 0 && totalCost > 0) ? birzhaTotal - totalCost : null;
+    const diffLabel       = diff !== null ? (diff >= 0 ? '💰 Доход' : '📉 Убыток') : '';
+    const saving          = (item.hasDiscount && discount > 0 && totalCostNoDisc > 0) ? totalCostNoDisc - totalCost : null;
 
-    const incomeClass = income === null ? '' : (income >= 0 ? 'saving' : 'loss');
-    const incomeSign  = income !== null ? (income >= 0 ? '+' : '') : '';
+    const margin          = (diff !== null && birzhaTotal > 0) ? diff / birzhaTotal * 100 : null;
+    const roi             = (diff !== null && totalCost > 0)   ? diff / totalCost * 100 : null;
+
+    const diffClass       = diff === null ? '' : (diff >= 0 ? 'saving' : 'loss');
+    const diffSign        = diff !== null ? (diff >= 0 ? '+' : '') : '';
 
     const finHTML = `<div class="expand-section">
         <div class="expand-section-title">💹 Финансовые показатели${effectiveQty > 1 ? ' (×' + effectiveQty + ' шт.)' : ''}</div>
         <div class="fin-grid">
             ${totalCost > 0 ? `<div class="fin-row">
-                <span class="fin-label">🔨 Крафт (из ресурсов)</span>
-                <span class="fin-value">${fmt(totalCost * effectiveQty)} 🪙</span>
+                <span class="fin-label">🔨 Крафт${saving !== null ? ` (со скидкой ${discount}%)` : ''}</span>
+                <span class="fin-value">${fmt(totalCost)} 🪙</span>
             </div>` : ''}
             ${saving !== null ? `<div class="fin-row">
-                <span class="fin-label">🏷️ Крафт со скидкой ${discount}%</span>
-                <span class="fin-value saving">${fmt(craftCostDisc * effectiveQty)} 🪙</span>
+                <span class="fin-label">🏷️ Без скидки</span>
+                <span class="fin-value" style="text-decoration:line-through;opacity:0.6">${fmt(totalCostNoDisc)} 🪙</span>
             </div>` : ''}
-            ${marketPrice > 0 ? `<div class="fin-row">
+            ${birzhaTotal > 0 ? `<div class="fin-row">
                 <span class="fin-label">📈 Биржа</span>
-                <span class="fin-value">${fmt(marketPrice * effectiveQty)} 🪙</span>
+                <span class="fin-value">${fmt(birzhaTotal)} 🪙</span>
             </div>` : ''}
-            ${income !== null ? `<div class="fin-row">
-                <span class="fin-label">💰 Доход</span>
-                <span class="fin-value ${incomeClass}">${incomeSign}${fmt(income * effectiveQty)} 🪙</span>
+            ${diff !== null ? `<div class="fin-row">
+                <span class="fin-label">${diffLabel}</span>
+                <span class="fin-value ${diffClass}">${diffSign}${fmt(diff)} 🪙</span>
+            </div>` : ''}
+            ${margin !== null ? `<div class="fin-row">
+                <span class="fin-label">📊 Маржа</span>
+                <span class="fin-value ${diffClass}">${margin.toFixed(1)}%</span>
+            </div>` : ''}
+            ${roi !== null ? `<div class="fin-row">
+                <span class="fin-label">💹 ROI</span>
+                <span class="fin-value ${diffClass}">${roi.toFixed(1)}%${roi > 0 ? ` <span style="font-size:10px;opacity:0.7;font-weight:400">в ${(1 + roi / 100).toFixed(1)}×</span>` : ''}</span>
             </div>` : ''}
         </div>
     </div>`;
@@ -798,10 +826,8 @@ function updateCalcTotal() {
     ALL_ITEMS.forEach(item => {
         const qty = quantities[item.name] || 0;
         if (qty <= 0) return;
-        const craftCost = calcCraftCost(item);
-        const cost = (item.hasDiscount && discount > 0 && craftCost > 0)
-            ? craftCost * (1 - discount / 100)
-            : (craftCost > 0 ? craftCost : item.cost);
+        const craftCost = calcCraftCost(item, discount);
+        const cost = craftCost > 0 ? craftCost : item.cost;
         total += cost * qty;
     });
     document.getElementById('calc-total').textContent = fmt(total) + ' 🪙';
@@ -817,9 +843,37 @@ function filtered() {
         (!activeCategory || item.cat === activeCategory) &&
         (!searchQuery || item.name.toLowerCase().includes(searchQuery))
     );
-    if (sortOrder === 'asc')  items = items.sort((a,b) => calcCraftCost(a) - calcCraftCost(b));
-    if (sortOrder === 'desc') items = items.sort((a,b) => calcCraftCost(b) - calcCraftCost(a));
+
+    // Фильтр по окупаемости
+    if (roiFilter !== 'all') {
+        items = items.filter(item => {
+            const craftCost = calcCraftCost(item, discount);
+            const birzha    = item.cost || 0;
+            const roi       = (birzha > 0 && craftCost > 0) ? birzha / craftCost - 1 : null;
+            if (roi === null) return false;
+            return roiFilter === 'profit' ? roi > 0 : roi < 0;
+        });
+    }
+    if (sortOrder === 'asc')  items = items.sort((a,b) => calcCraftCost(a, discount) - calcCraftCost(b, discount));
+    if (sortOrder === 'desc') items = items.sort((a,b) => calcCraftCost(b, discount) - calcCraftCost(a, discount));
+
+    if (sortOrderRoi === 'roi-desc' || sortOrderRoi === 'roi-asc') {
+        items = items.sort((a, b) => {
+            const roiA = getROI(a);
+            const roiB = getROI(b);
+            if (roiA === null && roiB === null) return 0;
+            if (roiA === null) return 1;
+            if (roiB === null) return -1;
+            return sortOrderRoi === 'roi-desc' ? roiB - roiA : roiA - roiB;
+        });
+    }
     return items;
+}
+
+function getROI(item) {
+    const craftCost = calcCraftCost(item, discount);
+    const birzha    = item.cost || 0;
+    return (birzha > 0 && craftCost > 0) ? (birzha - craftCost) / craftCost : null;
 }
 
 function renderCard(item) {
@@ -836,40 +890,38 @@ function renderCard(item) {
         return `<div class="res-item" title="${meta.label}"><span class="res-emoji">${meta.emoji}</span><span class="res-label">${meta.label}</span><span class="res-value">${v.toLocaleString('ru-RU')}</span></div>`;
     }).join('');
 
-    // ===== БЛОК ЦЕН: КРАФТ / БИРЖА / ДОХОД =====
-    const craftCostRaw  = calcCraftCost(item);
-    const craftCostDisc = (item.hasDiscount && discount > 0 && craftCostRaw > 0)
-        ? craftCostRaw * (1 - discount / 100)
-        : craftCostRaw;
-    const marketPrice   = item.market_price || 0;
-    const income        = (marketPrice > 0 && craftCostDisc > 0) ? marketPrice - craftCostDisc : null;
+    // ===== БЛОК ЦЕН: КРАФТ / БИРЖА / ДОХОД (или УБЫТОК) =====
+    const craftCost     = calcCraftCost(item, discount);
+    const birzhaPrice   = item.cost || 0;
+    const diff          = (birzhaPrice > 0 && craftCost > 0) ? birzhaPrice - craftCost : null;
+    const diffLabel     = diff !== null ? (diff >= 0 ? 'Доход' : 'Убыток') : '';
 
     const timeBadge = item.time > 0 ? `<span class="badge badge-type">⏱ ${item.time} мин</span>` : '';
     const discBadge = item.hasDiscount ? `<span class="badge" style="background:rgba(74,222,128,0.1);color:#4ade80;border:1px solid rgba(74,222,128,0.25)">🏷️ Скидка</span>` : '';
 
     let pricesHTML = '';
-    if (craftCostDisc > 0 || marketPrice > 0) {
-        const incomeColor = income === null ? '' : (income >= 0 ? '#4ade80' : '#f87171');
-        const incomeSign  = income !== null ? (income >= 0 ? '+' : '') : '';
+    if (craftCost > 0 || birzhaPrice > 0) {
+        const diffColor = diff === null ? '' : (diff >= 0 ? '#4ade80' : '#f87171');
+        const diffSign  = diff !== null ? (diff >= 0 ? '+' : '') : '';
 
         pricesHTML = `<div class="craft-prices-row">
-            ${craftCostDisc > 0 ? `<div class="price-cell">
+            ${craftCost > 0 ? `<div class="price-cell">
                 <span class="price-cell-label">Крафт</span>
-                <span class="price-cell-value cost">${fmt(craftCostDisc)} 🪙</span>
+                <span class="price-cell-value cost">${fmt(craftCost)} 🪙</span>
             </div>` : ''}
-            ${marketPrice > 0 ? `<div class="price-cell">
+            ${birzhaPrice > 0 ? `<div class="price-cell">
                 <span class="price-cell-label">Биржа</span>
-                <span class="price-cell-value cost">${fmt(marketPrice)} 🪙</span>
+                <span class="price-cell-value cost">${fmt(birzhaPrice)} 🪙</span>
             </div>` : ''}
-            ${income !== null ? `<div class="price-cell">
-                <span class="price-cell-label">Доход</span>
-                <span class="price-cell-value" style="color:${incomeColor}">${incomeSign}${fmt(income)} 🪙</span>
+            ${diff !== null ? `<div class="price-cell">
+                <span class="price-cell-label">${diffLabel}</span>
+                <span class="price-cell-value" style="color:${diffColor}">${diffSign}${fmt(diff)} 🪙</span>
             </div>` : ''}
         </div>`;
     }
 
     // Footer: итог количества
-    const effectiveCost = craftCostDisc > 0 ? craftCostDisc : item.cost;
+    const effectiveCost = craftCost > 0 ? craftCost : item.cost;
     const lineTotal = qty > 0
         ? `<span class="total-sum">×${qty} = <span>${fmt(effectiveCost * qty)} 🪙</span></span>`
         : '<span style="font-size:11px;color:var(--text-muted)">Кол-во</span>';
@@ -909,8 +961,9 @@ function render() {
     if (discount > 0) {
         const saving = items.filter(i => i.hasDiscount)
             .reduce((s, i) => {
-                const c = calcCraftCost(i);
-                return s + (c > 0 ? c * (discount / 100) : 0);
+                const cNoDisc = calcCraftCost(i, 0);
+                const cDisc   = calcCraftCost(i, discount);
+                return s + (cNoDisc - cDisc);
             }, 0);
         if (saving > 0) {
             savEl.style.display = 'block';
@@ -989,10 +1042,8 @@ function refreshCardFooter(name) {
     if (!card) return;
 
     const qty           = quantities[name] || 0;
-    const craftCostRaw  = calcCraftCost(item);
-    const effectiveCost = (item.hasDiscount && discount > 0 && craftCostRaw > 0)
-        ? craftCostRaw * (1 - discount / 100)
-        : (craftCostRaw > 0 ? craftCostRaw : item.cost);
+    const craftCost     = calcCraftCost(item, discount);
+    const effectiveCost = craftCost > 0 ? craftCost : item.cost;
 
     // Обновить input
     const inp = card.querySelector('.quantity-control input');
@@ -1050,7 +1101,6 @@ function dbRowToItem(row, catName) {
         cat:          catName,
         name:         row.name,
         cost:         row.craft_cost ?? 0,
-        market_price: row.market_price ?? 0,
         hasDiscount:  row.discount > 0,
         time:         row.craft_time ?? 0,
         res,
@@ -1165,25 +1215,68 @@ async function init() {
     // Сортировка
     document.getElementById('sort-desc').addEventListener('click', function() {
         sortOrder = sortOrder === 'desc' ? null : 'desc';
+        if (sortOrder === 'desc') sortOrderRoi = null;
         this.classList.toggle('active', sortOrder === 'desc');
         document.getElementById('sort-asc').classList.remove('active');
+        if (sortOrder === null) { document.getElementById('sort-roi-desc').classList.remove('active'); document.getElementById('sort-roi-asc').classList.remove('active'); }
         render();
     });
     document.getElementById('sort-asc').addEventListener('click', function() {
         sortOrder = sortOrder === 'asc' ? null : 'asc';
+        if (sortOrder === 'asc') sortOrderRoi = null;
         this.classList.toggle('active', sortOrder === 'asc')
         document.getElementById('sort-desc').classList.remove('active');
+        if (sortOrder === null) { document.getElementById('sort-roi-desc').classList.remove('active'); document.getElementById('sort-roi-asc').classList.remove('active'); }
+        render();
+    });
+    document.getElementById('sort-roi-desc').addEventListener('click', function() {
+        sortOrderRoi = sortOrderRoi === 'roi-desc' ? null : 'roi-desc';
+        if (sortOrderRoi === 'roi-desc') sortOrder = null;
+        this.classList.toggle('active', sortOrderRoi === 'roi-desc');
+        document.getElementById('sort-roi-asc').classList.remove('active');
+        document.getElementById('sort-desc').classList.remove('active');
+        document.getElementById('sort-asc').classList.remove('active');
+        render();
+    });
+    document.getElementById('sort-roi-asc').addEventListener('click', function() {
+        sortOrderRoi = sortOrderRoi === 'roi-asc' ? null : 'roi-asc';
+        if (sortOrderRoi === 'roi-asc') sortOrder = null;
+        this.classList.toggle('active', sortOrderRoi === 'roi-asc');
+        document.getElementById('sort-roi-desc').classList.remove('active');
+        document.getElementById('sort-desc').classList.remove('active');
+        document.getElementById('sort-asc').classList.remove('active');
+        render();
+    });
+
+    // Окупаемость
+    document.getElementById('roi-all').addEventListener('click', function() {
+        roiFilter = 'all';
+        document.querySelectorAll('#roi-filters .sort-btn').forEach(b => b.classList.remove('active'));
+        this.classList.add('active');
+        render();
+    });
+    document.getElementById('roi-profit').addEventListener('click', function() {
+        roiFilter = 'profit';
+        document.querySelectorAll('#roi-filters .sort-btn').forEach(b => b.classList.remove('active'));
+        this.classList.add('active');
+        render();
+    });
+    document.getElementById('roi-loss').addEventListener('click', function() {
+        roiFilter = 'loss';
+        document.querySelectorAll('#roi-filters .sort-btn').forEach(b => b.classList.remove('active'));
+        this.classList.add('active');
         render();
     });
 
     // Сброс
     document.getElementById('btn-reset').addEventListener('click', () => {
-        activeCategory = null; searchQuery = ''; sortOrder = null;
+        activeCategory = null; searchQuery = ''; sortOrder = null; sortOrderRoi = null;
+        roiFilter = 'all';
         document.getElementById('search-input').value = '';
         setDiscount(0);
         document.querySelectorAll('#cat-filters .btn-filter').forEach(b => b.classList.remove('active'));
-        document.getElementById('sort-desc').classList.remove('active');
-        document.getElementById('sort-asc').classList.remove('active');
+        document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById('roi-all').classList.add('active');
     });
 
     // Очистить калькулятор
