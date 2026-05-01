@@ -700,9 +700,15 @@ function calcCraftCost(item, disc) {
         }, 0);
 }
 
+function getUnitCost(item, disc) {
+    const batchCost = calcCraftCost(item, disc);
+    return batchCost / (item.quantity || 1);
+}
+
 // ===== ТАБЛИЦА СЕБЕСТОИМОСТИ =====
 function buildExpandHTML(item, qty) {
     const effectiveQty = Math.max(qty || 1, 1);
+    const itemQty      = item.quantity || 1;
     const craftEntries = Object.entries(item.res || {}).filter(([,v]) => v > 0);
 
     if (!craftEntries.length) {
@@ -718,63 +724,39 @@ function buildExpandHTML(item, qty) {
     const effectiveDisc = item.hasDiscount ? discount : 0;
     const rows = craftEntries.map(([col, amount]) => {
         const effectiveAmt = effectiveDisc > 0 ? Math.floor(amount * (1 - effectiveDisc / 100)) : amount;
-        const unitPrice  = getUnitPrice(col);
-        const totalAmt   = effectiveAmt * effectiveQty;
-        const totalPrice = totalAmt * unitPrice;
+        const unitPrice    = getUnitPrice(col);
+        const totalPrice   = effectiveAmt * unitPrice;
         totalCost += totalPrice;
-        return { col, amount, effectiveAmt, totalAmt, unitPrice, totalPrice };
+        return { col, amount: effectiveAmt, unitPrice, totalPrice };
     });
     rows.forEach(r => r.share = totalCost > 0 ? r.totalPrice / totalCost * 100 : 0);
 
-    const tableRows = rows.map(r => {
-        const meta     = RES_LABELS_CRAFT[r.col] || { label: r.col, emoji: '📦' };
-        const barW     = Math.max(1, Math.round(r.share));
-        const unitStr  = r.unitPrice > 0 ? r.unitPrice.toLocaleString('ru-RU', {maximumFractionDigits:2}) + ' 🪙' : '—';
-        const totalStr = r.totalPrice > 0 ? Math.round(r.totalPrice).toLocaleString('ru-RU') + ' 🪙' : '—';
-        return `<tr>
-            <td>${meta.emoji} ${meta.label}</td>
-            <td class="num">${r.totalAmt.toLocaleString('ru-RU')}</td>
-            <td class="num">${unitStr}</td>
-            <td class="num">${totalStr}</td>
-            <td class="num">
-                <div class="share-bar-wrap">
-                    <div class="share-bar-track"><div class="share-bar" style="width:${barW}%"></div></div>
-                    <span class="share-pct">${Math.round(r.share)}%</span>
-                </div>
-            </td>
-        </tr>`;
-    }).join('');
+    // Делим на количество предметов в крафте для цены за 1 единицу
+    const costPerUnit = totalCost / itemQty;
+    const qtyInfo     = itemQty > 1 ? ` | 📦 ${itemQty} шт/крафт` : '';
 
-    const totalStr    = totalCost > 0 ? Math.round(totalCost).toLocaleString('ru-RU') + ' 🪙' : '—';
-    const titleSuffix = totalCost > 0 ? ` (${Math.round(totalCost).toLocaleString('ru-RU')} 🪙)` : '';
+    // Финансовые показатели (за 1 единицу)
+    const unitCost    = costPerUnit;
+    const birzhaPrice = item.cost || 0;
+    const diff        = (birzhaPrice > 0 && unitCost > 0) ? birzhaPrice - unitCost : null;
+    const diffLabel   = diff !== null ? (diff >= 0 ? '💰 Доход' : '📉 Убыток') : '';
 
-    // Финансовый блок (totalCost уже со скидкой, посчитан выше)
-    const totalCostNoDisc = calcCraftCost(item, 0) * effectiveQty;
-    const birzhaTotal     = (item.cost || 0) * effectiveQty;
-    const diff            = (birzhaTotal > 0 && totalCost > 0) ? birzhaTotal - totalCost : null;
-    const diffLabel       = diff !== null ? (diff >= 0 ? '💰 Доход' : '📉 Убыток') : '';
-    const saving          = (item.hasDiscount && discount > 0 && totalCostNoDisc > 0) ? totalCostNoDisc - totalCost : null;
+    const margin      = (diff !== null && birzhaPrice > 0) ? diff / birzhaPrice * 100 : null;
+    const roi         = (diff !== null && unitCost > 0)    ? diff / unitCost * 100 : null;
 
-    const margin          = (diff !== null && birzhaTotal > 0) ? diff / birzhaTotal * 100 : null;
-    const roi             = (diff !== null && totalCost > 0)   ? diff / totalCost * 100 : null;
-
-    const diffClass       = diff === null ? '' : (diff >= 0 ? 'saving' : 'loss');
-    const diffSign        = diff !== null ? (diff >= 0 ? '+' : '') : '';
+    const diffClass   = diff === null ? '' : (diff >= 0 ? 'saving' : 'loss');
+    const diffSign    = diff !== null ? (diff >= 0 ? '+' : '') : '';
 
     const finHTML = `<div class="expand-section">
         <div class="expand-section-title">💹 Финансовые показатели${effectiveQty > 1 ? ' (×' + effectiveQty + ' шт.)' : ''}</div>
         <div class="fin-grid">
-            ${totalCost > 0 ? `<div class="fin-row">
-                <span class="fin-label">🔨 Крафт${saving !== null ? ` (со скидкой ${discount}%)` : ''}</span>
-                <span class="fin-value">${fmt(totalCost)} 🪙</span>
+            ${unitCost > 0 ? `<div class="fin-row">
+                <span class="fin-label">🔨 Крафт${item.hasDiscount && discount > 0 ? ` (скидка ${discount}%)` : ''}</span>
+                <span class="fin-value">${fmt(unitCost)} 🪙</span>
             </div>` : ''}
-            ${saving !== null ? `<div class="fin-row">
-                <span class="fin-label">🏷️ Без скидки</span>
-                <span class="fin-value" style="text-decoration:line-through;opacity:0.6">${fmt(totalCostNoDisc)} 🪙</span>
-            </div>` : ''}
-            ${birzhaTotal > 0 ? `<div class="fin-row">
+            ${birzhaPrice > 0 ? `<div class="fin-row">
                 <span class="fin-label">📈 Биржа</span>
-                <span class="fin-value">${fmt(birzhaTotal)} 🪙</span>
+                <span class="fin-value">${fmt(birzhaPrice)} 🪙</span>
             </div>` : ''}
             ${diff !== null ? `<div class="fin-row">
                 <span class="fin-label">${diffLabel}</span>
@@ -791,9 +773,36 @@ function buildExpandHTML(item, qty) {
         </div>
     </div>`;
 
+    const tableRows = rows.map(r => {
+        const meta     = RES_LABELS_CRAFT[r.col] || { label: r.col, emoji: '📦' };
+        const amtPerUnit = r.amount / itemQty;
+        const barW     = Math.max(1, Math.round(r.share));
+        const unitStr  = r.unitPrice > 0 ? r.unitPrice.toLocaleString('ru-RU', {maximumFractionDigits:2}) + ' 🪙' : '—';
+        const totalPerUnit = r.totalPrice / itemQty;
+        const totalStr = totalPerUnit > 0 ? Math.round(totalPerUnit).toLocaleString('ru-RU') + ' 🪙' : '—';
+        const amtStr = amtPerUnit > 0
+            ? (Number.isInteger(amtPerUnit) ? amtPerUnit.toLocaleString('ru-RU') : amtPerUnit.toLocaleString('ru-RU', { maximumFractionDigits: 4 }))
+            : '—';
+        return `<tr>
+            <td>${meta.emoji} ${meta.label}</td>
+            <td class="num">${amtStr}</td>
+            <td class="num">${unitStr}</td>
+            <td class="num">${totalStr}</td>
+            <td class="num">
+                <div class="share-bar-wrap">
+                    <div class="share-bar-track"><div class="share-bar" style="width:${barW}%"></div></div>
+                    <span class="share-pct">${Math.round(r.share)}%</span>
+                </div>
+            </td>
+        </tr>`;
+    }).join('');
+
+    const totalPerUnitStr = costPerUnit > 0 ? Math.round(costPerUnit).toLocaleString('ru-RU') + ' 🪙' : '—';
+    const titleSuffix = costPerUnit > 0 ? ` (${totalPerUnitStr})` : '';
+
     return `<div class="craft-expand-inner">
         <div class="expand-section">
-            <div class="expand-section-title">📊 Структура себестоимости${titleSuffix}</div>
+            <div class="expand-section-title">📊 Структура себестоимости${titleSuffix}${qtyInfo}</div>
             <div class="expand-table-wrap">
                 <table class="expand-table">
                     <thead>
@@ -809,7 +818,7 @@ function buildExpandHTML(item, qty) {
                     <tfoot>
                         <tr>
                             <td colspan="3">Итого</td>
-                            <td class="num">${totalStr}</td>
+                            <td class="num">${totalPerUnitStr}</td>
                             <td></td>
                         </tr>
                     </tfoot>
@@ -826,8 +835,8 @@ function updateCalcTotal() {
     ALL_ITEMS.forEach(item => {
         const qty = quantities[item.name] || 0;
         if (qty <= 0) return;
-        const craftCost = calcCraftCost(item, discount);
-        const cost = craftCost > 0 ? craftCost : item.cost;
+        const unitCost = getUnitCost(item, discount);
+        const cost = unitCost > 0 ? unitCost : item.cost;
         total += cost * qty;
     });
     document.getElementById('calc-total').textContent = fmt(total) + ' 🪙';
@@ -847,15 +856,15 @@ function filtered() {
     // Фильтр по окупаемости
     if (roiFilter !== 'all') {
         items = items.filter(item => {
-            const craftCost = calcCraftCost(item, discount);
-            const birzha    = item.cost || 0;
-            const roi       = (birzha > 0 && craftCost > 0) ? birzha / craftCost - 1 : null;
+            const unitCost = getUnitCost(item, discount);
+            const birzha   = item.cost || 0;
+            const roi      = (birzha > 0 && unitCost > 0) ? (birzha - unitCost) / unitCost : null;
             if (roi === null) return false;
             return roiFilter === 'profit' ? roi > 0 : roi < 0;
         });
     }
-    if (sortOrder === 'asc')  items = items.sort((a,b) => calcCraftCost(a, discount) - calcCraftCost(b, discount));
-    if (sortOrder === 'desc') items = items.sort((a,b) => calcCraftCost(b, discount) - calcCraftCost(a, discount));
+    if (sortOrder === 'asc')  items = items.sort((a,b) => getUnitCost(a, discount) - getUnitCost(b, discount));
+    if (sortOrder === 'desc') items = items.sort((a,b) => getUnitCost(b, discount) - getUnitCost(a, discount));
 
     if (sortOrderRoi === 'roi-desc' || sortOrderRoi === 'roi-asc') {
         items = items.sort((a, b) => {
@@ -871,9 +880,9 @@ function filtered() {
 }
 
 function getROI(item) {
-    const craftCost = calcCraftCost(item, discount);
+    const unitCost = getUnitCost(item, discount);
     const birzha    = item.cost || 0;
-    return (birzha > 0 && craftCost > 0) ? (birzha - craftCost) / craftCost : null;
+    return (birzha > 0 && unitCost > 0) ? (birzha - unitCost) / unitCost : null;
 }
 
 function renderCard(item) {
@@ -891,23 +900,24 @@ function renderCard(item) {
     }).join('');
 
     // ===== БЛОК ЦЕН: КРАФТ / БИРЖА / ДОХОД (или УБЫТОК) =====
-    const craftCost     = calcCraftCost(item, discount);
+    const unitCost      = getUnitCost(item, discount);
     const birzhaPrice   = item.cost || 0;
-    const diff          = (birzhaPrice > 0 && craftCost > 0) ? birzhaPrice - craftCost : null;
+    const diff          = (birzhaPrice > 0 && unitCost > 0) ? birzhaPrice - unitCost : null;
     const diffLabel     = diff !== null ? (diff >= 0 ? 'Доход' : 'Убыток') : '';
+    const qtyBadge      = item.quantity > 1 ? `<span class="badge badge-type">📦 ${item.quantity} шт/крафт</span>` : '';
 
     const timeBadge = item.time > 0 ? `<span class="badge badge-type">⏱ ${item.time} мин</span>` : '';
     const discBadge = item.hasDiscount ? `<span class="badge" style="background:rgba(74,222,128,0.1);color:#4ade80;border:1px solid rgba(74,222,128,0.25)">🏷️ Скидка</span>` : '';
 
     let pricesHTML = '';
-    if (craftCost > 0 || birzhaPrice > 0) {
+    if (unitCost > 0 || birzhaPrice > 0) {
         const diffColor = diff === null ? '' : (diff >= 0 ? '#4ade80' : '#f87171');
         const diffSign  = diff !== null ? (diff >= 0 ? '+' : '') : '';
 
         pricesHTML = `<div class="craft-prices-row">
-            ${craftCost > 0 ? `<div class="price-cell">
+            ${unitCost > 0 ? `<div class="price-cell">
                 <span class="price-cell-label">Крафт</span>
-                <span class="price-cell-value cost">${fmt(craftCost)} 🪙</span>
+                <span class="price-cell-value cost">${fmt(unitCost)} 🪙</span>
             </div>` : ''}
             ${birzhaPrice > 0 ? `<div class="price-cell">
                 <span class="price-cell-label">Биржа</span>
@@ -921,7 +931,7 @@ function renderCard(item) {
     }
 
     // Footer: итог количества
-    const effectiveCost = craftCost > 0 ? craftCost : item.cost;
+    const effectiveCost = unitCost > 0 ? unitCost : item.cost;
     const lineTotal = qty > 0
         ? `<span class="total-sum">×${qty} = <span>${fmt(effectiveCost * qty)} 🪙</span></span>`
         : '<span style="font-size:11px;color:var(--text-muted)">Кол-во</span>';
@@ -934,7 +944,7 @@ function renderCard(item) {
                 <span class="expand-chevron">▼</span>
                 ${pricesHTML}
             </div>
-            <div class="craft-res-row">${timeBadge}${discBadge}</div>
+            <div class="craft-res-row">${qtyBadge}${timeBadge}${discBadge}</div>
             <div class="res-grid" style="margin-top:6px">${resItems || '<span style="color:var(--text-muted);font-size:11px">— нет данных —</span>'}</div>
         </div>
         <div class="craft-footer" onclick="event.stopPropagation()">
@@ -961,8 +971,8 @@ function render() {
     if (discount > 0) {
         const saving = items.filter(i => i.hasDiscount)
             .reduce((s, i) => {
-                const cNoDisc = calcCraftCost(i, 0);
-                const cDisc   = calcCraftCost(i, discount);
+                const cNoDisc = getUnitCost(i, 0);
+                const cDisc   = getUnitCost(i, discount);
                 return s + (cNoDisc - cDisc);
             }, 0);
         if (saving > 0) {
@@ -1042,8 +1052,8 @@ function refreshCardFooter(name) {
     if (!card) return;
 
     const qty           = quantities[name] || 0;
-    const craftCost     = calcCraftCost(item, discount);
-    const effectiveCost = craftCost > 0 ? craftCost : item.cost;
+    const unitCost      = getUnitCost(item, discount);
+    const effectiveCost = unitCost > 0 ? unitCost : item.cost;
 
     // Обновить input
     const inp = card.querySelector('.quantity-control input');
@@ -1101,6 +1111,7 @@ function dbRowToItem(row, catName) {
         cat:          catName,
         name:         row.name,
         cost:         row.craft_cost ?? 0,
+        quantity:     row.quantity ?? 1,
         hasDiscount:  row.discount > 0,
         time:         row.craft_time ?? 0,
         res,
@@ -1136,7 +1147,7 @@ const LOCAL_DATA = [
     { cat:'Разное',name:'Порцион',cost:71,market_price:0,hasDiscount:false,time:2,res:{rum:1,supplies:2,fresh_meat:3}},
     { cat:'Разное',name:'Снасти',cost:30,market_price:0,hasDiscount:false,time:1,res:{wood:5,iron:1}},
     { cat:'Разное',name:'Чугунные ядра',cost:144,market_price:0,hasDiscount:false,time:1,res:{iron:8}},
-    { cat:'Разное',name:'Брандскугели',cost:120,market_price:0,hasDiscount:false,time:1,res:{iron:5,battle_mark:2}},
+    { cat:'Разное',name:'Брандскугели',cost:120,quantity:100,market_price:0,hasDiscount:false,time:1,res:{iron:5,battle_mark:2}},
     { cat:'Разное',name:'Бомбы осколочные',cost:114,market_price:0,hasDiscount:false,time:1,res:{iron:5,copper:1}},
     { cat:'Разное',name:'Малые поджигающие бочки',cost:400,market_price:0,hasDiscount:false,time:1,res:{wood:100,whale_oil:10}},
     { cat:'Разное',name:'Большие осколочные мины',cost:4180,market_price:0,hasDiscount:false,time:1,res:{wood:200,animals:20}},
