@@ -1018,7 +1018,7 @@ function render() {
 
     document.querySelectorAll('.craft-card').forEach(card => {
       card.addEventListener('click', (e) => {
-    if (e.target.closest('button, input, .quantity-control, .fav-btn, .craft-footer')) return;
+    if (e.target.closest('button, input, .quantity-control, .fav-btn, .craft-footer, .craft-expand')) return;
     toggleExpand(card.dataset.name);
 });
 
