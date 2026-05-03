@@ -641,15 +641,6 @@ const RES_COL_TO_NAME = {
 
 const DB_RES_COLS = Object.keys(RES_LABELS_CRAFT);
 
-// ===== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ =====
-function debounce(fn, delay = 300) {
-    let timer;
-    return function(...args) {
-        clearTimeout(timer);
-        timer = setTimeout(() => fn.apply(this, args), delay);
-    };
-}
-
 const CAT_ICONS = {
     'Мастерские': '🏭', 'Переработка': '♻️',
     'Расходные предметы': '🎒', 'Разное': '📦'
@@ -1004,6 +995,11 @@ function render() {
         </div>`;
     }).join('');
 
+    // Навешиваем обработчики клика по карточке
+    document.querySelectorAll('.craft-card').forEach(card => {
+        card.addEventListener('click', () => toggleExpand(card.dataset.name));
+    });
+
     updateCalcTotal();
 }
 
@@ -1114,7 +1110,7 @@ function dbRowToItem(row, catName) {
     return {
         cat:          catName,
         name:         row.name,
-        cost:         row.market_price ?? row.craft_cost ?? 0, // Используем market_price если есть
+        cost:         row.craft_cost ?? 0,
         quantity:     row.quantity ?? 1,
         hasDiscount:  row.discount > 0,
         time:         row.craft_time ?? 0,
@@ -1221,11 +1217,11 @@ async function init() {
     document.getElementById('discount-slider').addEventListener('input', e => setDiscount(e.target.value));
     document.querySelectorAll('.preset-btn').forEach(b => b.addEventListener('click', () => setDiscount(b.dataset.val)));
 
-    // Поиск (с debounce для производительности)
-    document.getElementById('search-input').addEventListener('input', debounce(function() {
+    // Поиск
+    document.getElementById('search-input').addEventListener('input', function() {
         searchQuery = this.value.toLowerCase().trim();
         render();
-    }, 300));
+    });
 
     // Сортировка
     document.getElementById('sort-desc').addEventListener('click', function() {
@@ -1298,32 +1294,6 @@ async function init() {
     document.getElementById('calc-clear').addEventListener('click', () => {
         quantities = {};
         render();
-    });
-
-    // Делегирование событий для карточек (вместо множественных addEventListener)
-    document.getElementById('craft-container').addEventListener('click', function(e) {
-        const card = e.target.closest('.craft-card');
-        if (!card) return;
-        const name = card.dataset.name;
-
-        // Клик по карточке (не по кнопкам)
-        if (!e.target.closest('.craft-footer') && !e.target.closest('.fav-btn')) {
-            toggleExpand(name);
-            return;
-        }
-
-        // Избранное
-        if (e.target.closest('.fav-btn')) {
-            e.stopPropagation();
-            toggleFav(name, e);
-            return;
-        }
-
-        // Кнопки количества
-        if (e.target.closest('.quantity-control button')) {
-            e.stopPropagation();
-            return; // Обработчики уже на кнопках через onclick
-        }
     });
 
     render();
