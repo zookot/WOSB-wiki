@@ -1017,8 +1017,10 @@ function render() {
     }).join('');
 
     document.querySelectorAll('.craft-card').forEach(card => {
-        card.addEventListener('click', () => toggleExpand(card.dataset.name));
-    });
+      card.addEventListener('click', (e) => {
+    if (e.target.closest('button, input, .quantity-control, .fav-btn, .craft-footer')) return;
+    toggleExpand(card.dataset.name);
+});
 
     updateCalcTotal();
 }
