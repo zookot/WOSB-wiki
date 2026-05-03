@@ -1115,7 +1115,7 @@
             document.querySelectorAll('.gun-card').forEach(card => {
                 card.addEventListener('click', (e) => {
                     // Не реагируем на клик по интерактивным элементам внутри карточки
-                    if (e.target.closest('button, input, .quantity-control, .fav-btn')) return;
+                    if (e.target.closest('button, input, .quantity-control, .fav-btn', .gun-footer')) return;
 
                     const name = card.dataset.name;
                     const gun = ALL_GUNS.find(g => g.name === name);
