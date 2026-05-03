@@ -753,6 +753,7 @@ function buildExpandHTML(item, qty) {
     const diffClass   = diff === null ? '' : (diff >= 0 ? 'saving' : 'loss');
     const diffSign    = diff !== null ? (diff >= 0 ? '+' : '') : '';
 
+    // Если qty > 1 — показываем только итоговые строки (×N шт.), без дублей "за 1 шт."
     const showSingle  = effectiveQty === 1;
     const showMulti   = effectiveQty > 1;
 
@@ -854,40 +855,6 @@ function buildExpandHTML(item, qty) {
     </div>`;
 }
 
-// ===== БЛОК ЦЕН В ШАПКЕ КАРТОЧКИ (пересчёт по qty) =====
-function buildPricesRowHTML(item, qty) {
-    const effectiveQty  = Math.max(qty || 1, 1);
-    const unitCost      = getUnitCost(item, discount);
-    const birzhaPrice   = item.cost || 0;
-
-    if (!unitCost && !birzhaPrice) return '';
-
-    const totalCost    = unitCost * effectiveQty;
-    const totalBirzha  = birzhaPrice * effectiveQty;
-    const diff         = (birzhaPrice > 0 && unitCost > 0) ? birzhaPrice - unitCost : null;
-    const diffTotal    = diff !== null ? diff * effectiveQty : null;
-    const diffLabel    = diff !== null ? (diff >= 0 ? 'Доход' : 'Убыток') : '';
-    const diffColor    = diff === null ? '' : (diff >= 0 ? '#4ade80' : '#f87171');
-    const diffSign     = diff !== null ? (diff >= 0 ? '+' : '') : '';
-
-    const showMulti    = effectiveQty > 1;
-
-    return `<div class="craft-prices-row">
-        ${unitCost > 0 ? `<div class="price-cell">
-            <span class="price-cell-label">Крафт${showMulti ? ' ×' + effectiveQty : ''}</span>
-            <span class="price-cell-value cost">${fmt(showMulti ? totalCost : unitCost)} 🪙</span>
-        </div>` : ''}
-        ${birzhaPrice > 0 ? `<div class="price-cell">
-            <span class="price-cell-label">Биржа${showMulti ? ' ×' + effectiveQty : ''}</span>
-            <span class="price-cell-value cost">${fmt(showMulti ? totalBirzha : birzhaPrice)} 🪙</span>
-        </div>` : ''}
-        ${diffTotal !== null ? `<div class="price-cell">
-            <span class="price-cell-label">${diffLabel}${showMulti ? ' ×' + effectiveQty : ''}</span>
-            <span class="price-cell-value" style="color:${diffColor}">${diffSign}${fmt(showMulti ? diffTotal : diff)} 🪙</span>
-        </div>` : ''}
-    </div>`;
-}
-
 // ===== КАЛЬКУЛЯТОР =====
 function updateCalcTotal() {
     let total = 0;
@@ -956,14 +923,37 @@ function renderCard(item) {
         return `<div class="res-item" title="${meta.label}"><span class="res-emoji">${meta.emoji}</span><span class="res-label">${meta.label}</span><span class="res-value">${v.toLocaleString('ru-RU')}</span></div>`;
     }).join('');
 
-    const qtyBadge  = item.quantity > 1 ? `<span class="badge badge-type">📦 ${item.quantity} шт/крафт</span>` : '';
+    const unitCost      = getUnitCost(item, discount);
+    const birzhaPrice   = item.cost || 0;
+    const diff          = (birzhaPrice > 0 && unitCost > 0) ? birzhaPrice - unitCost : null;
+    const diffLabel     = diff !== null ? (diff >= 0 ? 'Доход' : 'Убыток') : '';
+    const qtyBadge      = item.quantity > 1 ? `<span class="badge badge-type">📦 ${item.quantity} шт/крафт</span>` : '';
+
     const timeBadge = item.time > 0 ? `<span class="badge badge-type">⏱ ${item.time} мин</span>` : '';
     const discBadge = item.hasDiscount ? `<span class="badge" style="background:rgba(74,222,128,0.1);color:#4ade80;border:1px solid rgba(74,222,128,0.25)">🏷️ Скидка</span>` : '';
 
-    // Блок цен строится с учётом текущего qty
-    const pricesHTML = buildPricesRowHTML(item, Math.max(qty, 1));
+    let pricesHTML = '';
+    if (unitCost > 0 || birzhaPrice > 0) {
+        const diffColor = diff === null ? '' : (diff >= 0 ? '#4ade80' : '#f87171');
+        const diffSign  = diff !== null ? (diff >= 0 ? '+' : '') : '';
 
-    const effectiveCost = getUnitCost(item, discount) || item.cost;
+        pricesHTML = `<div class="craft-prices-row">
+            ${unitCost > 0 ? `<div class="price-cell">
+                <span class="price-cell-label">Крафт</span>
+                <span class="price-cell-value cost">${fmt(unitCost)} 🪙</span>
+            </div>` : ''}
+            ${birzhaPrice > 0 ? `<div class="price-cell">
+                <span class="price-cell-label">Биржа</span>
+                <span class="price-cell-value cost">${fmt(birzhaPrice)} 🪙</span>
+            </div>` : ''}
+            ${diff !== null ? `<div class="price-cell">
+                <span class="price-cell-label">${diffLabel}</span>
+                <span class="price-cell-value" style="color:${diffColor}">${diffSign}${fmt(diff)} 🪙</span>
+            </div>` : ''}
+        </div>`;
+    }
+
+    const effectiveCost = unitCost > 0 ? unitCost : item.cost;
     const lineTotal = qty > 0
         ? `<span class="total-sum">×${qty} = <span>${fmt(effectiveCost * qty)} 🪙</span></span>`
         : '<span style="font-size:11px;color:var(--text-muted)">Кол-во</span>';
@@ -1089,23 +1079,6 @@ function refreshCardFooter(name) {
 
     const inp = card.querySelector('.quantity-control input');
     if (inp) inp.value = qty;
-
-    // Обновляем блок цен в шапке карточки с учётом нового количества
-    const headerRow = card.querySelector('.craft-header-row');
-    if (headerRow) {
-        const oldPrices = headerRow.querySelector('.craft-prices-row');
-        const newPricesHTML = buildPricesRowHTML(item, Math.max(qty, 1));
-        if (newPricesHTML) {
-            const tmp = document.createElement('div');
-            tmp.innerHTML = newPricesHTML;
-            const newPricesEl = tmp.firstElementChild;
-            if (oldPrices) {
-                headerRow.replaceChild(newPricesEl, oldPrices);
-            } else {
-                headerRow.appendChild(newPricesEl);
-            }
-        }
-    }
 
     const footer = card.querySelector('.craft-footer');
     if (footer) {
