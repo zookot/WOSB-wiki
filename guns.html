@@ -655,6 +655,7 @@
                 <div class="sort-buttons">
                     <button class="sort-btn" id="sort-desc" title="Сначала дорогие">↓ Дорогие</button>
                     <button class="sort-btn" id="sort-asc" title="Сначала дешёвые">↑ Дешёвые</button>
+                    <button class="sort-btn" id="sort-roi" title="Сначала с высоким ROI">📈 ROI</button>
                 </div>
             </div>
             <button class="btn-reset" id="btn-reset">↺ Сбросить</button>
@@ -934,6 +935,16 @@
             const sorted = [...guns];
             if (sortOrder === 'desc') sorted.sort((a, b) => (b.market_price || 0) - (a.market_price || 0));
             else if (sortOrder === 'asc') sorted.sort((a, b) => (a.market_price || 0) - (b.market_price || 0));
+            else if (sortOrder === 'roi') {
+                const getRoi = g => {
+                    const cost = Object.entries(g.res || {})
+                        .filter(([k]) => k !== 'pirate_token')
+                        .reduce((s, [col, amt]) => s + getUnitPrice(col) * amt, 0);
+                    if (!cost || !g.market_price) return -Infinity;
+                    return (g.market_price - cost) / cost * 100;
+                };
+                sorted.sort((a, b) => getRoi(b) - getRoi(a));
+            }
             return sorted;
         }
 
@@ -1266,6 +1277,12 @@
                 if (sortOrder) this.classList.add('active');
                 render();
                 attachCardEvents();
+            });
+            document.getElementById('sort-roi').addEventListener('click', function () {
+                sortOrder = sortOrder === 'roi' ? null : 'roi';
+                document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
+                if (sortOrder) this.classList.add('active');
+                renderGuns();
             });
 
             document.getElementById('search-input').addEventListener('input', function () {
