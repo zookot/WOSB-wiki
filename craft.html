@@ -704,7 +704,7 @@ function getUnitCost(item, disc) {
 }
 
 // ===== ТАБЛИЦА СЕБЕСТОИМОСТИ =====
-// qty — количество штук из контрола (аналогично guns.html)
+// qty — количество штук из контрола
 function buildExpandHTML(item, qty) {
     const effectiveQty = Math.max(qty || 1, 1);
     const itemQty      = item.quantity || 1;
@@ -721,7 +721,7 @@ function buildExpandHTML(item, qty) {
 
     const effectiveDisc = item.hasDiscount ? discount : 0;
 
-    // Считаем строки: сначала на 1 крафт с учётом скидки, потом умножаем на effectiveQty
+    // Считаем строки на 1 крафт с учётом скидки
     let totalCostOneCraft = 0;
     const rows = craftEntries.map(([col, amount]) => {
         const effectiveAmt = effectiveDisc > 0 ? Math.floor(amount * (1 - effectiveDisc / 100)) : amount;
@@ -732,7 +732,7 @@ function buildExpandHTML(item, qty) {
     });
     rows.forEach(r => r.share = totalCostOneCraft > 0 ? r.totalPriceOneCraft / totalCostOneCraft * 100 : 0);
 
-    // Цена за 1 единицу товара (делим на кол-во в крафте)
+    // Цена за 1 единицу товара
     const costPerUnit = totalCostOneCraft / itemQty;
 
     // Итого с учётом выбранного количества
@@ -740,7 +740,7 @@ function buildExpandHTML(item, qty) {
 
     const qtyInfo = itemQty > 1 ? ` | 📦 ${itemQty} шт/крафт` : '';
 
-    // Финансовые показатели (за 1 единицу, для ориентира)
+    // Финансовые показатели
     const birzhaPrice = item.cost || 0;
     const birzhaTotal = birzhaPrice * effectiveQty;
     const diff        = (birzhaPrice > 0 && costPerUnit > 0) ? birzhaPrice - costPerUnit : null;
@@ -753,31 +753,37 @@ function buildExpandHTML(item, qty) {
     const diffClass   = diff === null ? '' : (diff >= 0 ? 'saving' : 'loss');
     const diffSign    = diff !== null ? (diff >= 0 ? '+' : '') : '';
 
+    // Если qty > 1 — показываем только итоговые строки (×N шт.), без дублей "за 1 шт."
+    const showSingle  = effectiveQty === 1;
+    const showMulti   = effectiveQty > 1;
+
+    const discountNote = item.hasDiscount && discount > 0 ? ` (скидка ${discount}%)` : '';
+
     const finHTML = `<div class="expand-section">
-        <div class="expand-section-title">💹 Финансовые показатели${effectiveQty > 1 ? ' (×' + effectiveQty + ' шт.)' : ''}</div>
+        <div class="expand-section-title">💹 Финансовые показатели${showMulti ? ' (×' + effectiveQty + ' шт.)' : ''}</div>
         <div class="fin-grid">
-            ${costPerUnit > 0 ? `<div class="fin-row">
-                <span class="fin-label">🔨 Крафт (1 шт.)${item.hasDiscount && discount > 0 ? ` (скидка ${discount}%)` : ''}</span>
+            ${costPerUnit > 0 && showSingle ? `<div class="fin-row">
+                <span class="fin-label">🔨 Крафт${discountNote}</span>
                 <span class="fin-value">${fmt(costPerUnit)} 🪙</span>
             </div>` : ''}
-            ${effectiveQty > 1 && costPerUnit > 0 ? `<div class="fin-row">
-                <span class="fin-label">🔨 Крафт (×${effectiveQty} шт.)</span>
+            ${costPerUnit > 0 && showMulti ? `<div class="fin-row">
+                <span class="fin-label">🔨 Крафт ×${effectiveQty} шт.${discountNote}</span>
                 <span class="fin-value">${fmt(totalCostTotal)} 🪙</span>
             </div>` : ''}
-            ${birzhaPrice > 0 ? `<div class="fin-row">
-                <span class="fin-label">📈 Биржа (1 шт.)</span>
+            ${birzhaPrice > 0 && showSingle ? `<div class="fin-row">
+                <span class="fin-label">📈 Биржа</span>
                 <span class="fin-value">${fmt(birzhaPrice)} 🪙</span>
             </div>` : ''}
-            ${effectiveQty > 1 && birzhaPrice > 0 ? `<div class="fin-row">
-                <span class="fin-label">📈 Биржа (×${effectiveQty} шт.)</span>
+            ${birzhaPrice > 0 && showMulti ? `<div class="fin-row">
+                <span class="fin-label">📈 Биржа ×${effectiveQty} шт.</span>
                 <span class="fin-value">${fmt(birzhaTotal)} 🪙</span>
             </div>` : ''}
-            ${diff !== null ? `<div class="fin-row">
-                <span class="fin-label">${diffLabel} (1 шт.)</span>
+            ${diff !== null && showSingle ? `<div class="fin-row">
+                <span class="fin-label">${diffLabel}</span>
                 <span class="fin-value ${diffClass}">${diffSign}${fmt(diff)} 🪙</span>
             </div>` : ''}
-            ${diffTotal !== null && effectiveQty > 1 ? `<div class="fin-row">
-                <span class="fin-label">${diffLabel} (×${effectiveQty} шт.)</span>
+            ${diffTotal !== null && showMulti ? `<div class="fin-row">
+                <span class="fin-label">${diffLabel} ×${effectiveQty} шт.</span>
                 <span class="fin-value ${diffClass}">${diffSign}${fmt(diffTotal)} 🪙</span>
             </div>` : ''}
             ${margin !== null ? `<div class="fin-row">
@@ -791,16 +797,13 @@ function buildExpandHTML(item, qty) {
         </div>
     </div>`;
 
-    // Строки таблицы: показываем количество на 1 единицу товара × effectiveQty
+    // Строки таблицы: количество ресурса для effectiveQty единиц товара
     const tableRows = rows.map(r => {
         const meta         = RES_LABELS_CRAFT[r.col] || { label: r.col, emoji: '📦' };
-        // Количество ресурса на 1 единицу товара
         const amtPerUnit   = r.amtOneCraft / itemQty;
-        // Итоговое количество ресурса для effectiveQty единиц
         const amtTotal     = amtPerUnit * effectiveQty;
         const barW         = Math.max(1, Math.round(r.share));
         const unitStr      = r.unitPrice > 0 ? r.unitPrice.toLocaleString('ru-RU', {maximumFractionDigits:2}) + ' 🪙' : '—';
-        // Итоговая стоимость ресурса для effectiveQty единиц
         const totalResPrice = (r.totalPriceOneCraft / itemQty) * effectiveQty;
         const totalStr      = totalResPrice > 0 ? Math.round(totalResPrice).toLocaleString('ru-RU') + ' 🪙' : '—';
         const amtStr = amtTotal > 0
