@@ -679,8 +679,6 @@ let discount       = 0;
 let roiFilter      = 'all'; // 'all' | 'profit' | 'loss'
 
 // ===== ЦЕНЫ РЕСУРСОВ =====
-// is_base=true  → берём cost_avg  (базовый ресурс, цена биржи)
-// is_base=false → берём cost_calc (производной ресурс, цена из базовых)
 function getUnitPrice(col) {
     const resName = RES_COL_TO_NAME[col];
     if (!resName) return 0;
@@ -706,6 +704,7 @@ function getUnitCost(item, disc) {
 }
 
 // ===== ТАБЛИЦА СЕБЕСТОИМОСТИ =====
+// qty — количество штук из контрола (аналогично guns.html)
 function buildExpandHTML(item, qty) {
     const effectiveQty = Math.max(qty || 1, 1);
     const itemQty      = item.quantity || 1;
@@ -720,29 +719,36 @@ function buildExpandHTML(item, qty) {
         </div>`;
     }
 
-    let totalCost = 0;
     const effectiveDisc = item.hasDiscount ? discount : 0;
+
+    // Считаем строки: сначала на 1 крафт с учётом скидки, потом умножаем на effectiveQty
+    let totalCostOneCraft = 0;
     const rows = craftEntries.map(([col, amount]) => {
         const effectiveAmt = effectiveDisc > 0 ? Math.floor(amount * (1 - effectiveDisc / 100)) : amount;
         const unitPrice    = getUnitPrice(col);
         const totalPrice   = effectiveAmt * unitPrice;
-        totalCost += totalPrice;
-        return { col, amount: effectiveAmt, unitPrice, totalPrice };
+        totalCostOneCraft += totalPrice;
+        return { col, amtOneCraft: effectiveAmt, unitPrice, totalPriceOneCraft: totalPrice };
     });
-    rows.forEach(r => r.share = totalCost > 0 ? r.totalPrice / totalCost * 100 : 0);
+    rows.forEach(r => r.share = totalCostOneCraft > 0 ? r.totalPriceOneCraft / totalCostOneCraft * 100 : 0);
 
-    // Делим на количество предметов в крафте для цены за 1 единицу
-    const costPerUnit = totalCost / itemQty;
-    const qtyInfo     = itemQty > 1 ? ` | 📦 ${itemQty} шт/крафт` : '';
+    // Цена за 1 единицу товара (делим на кол-во в крафте)
+    const costPerUnit = totalCostOneCraft / itemQty;
 
-    // Финансовые показатели (за 1 единицу)
-    const unitCost    = costPerUnit;
+    // Итого с учётом выбранного количества
+    const totalCostTotal = costPerUnit * effectiveQty;
+
+    const qtyInfo = itemQty > 1 ? ` | 📦 ${itemQty} шт/крафт` : '';
+
+    // Финансовые показатели (за 1 единицу, для ориентира)
     const birzhaPrice = item.cost || 0;
-    const diff        = (birzhaPrice > 0 && unitCost > 0) ? birzhaPrice - unitCost : null;
+    const birzhaTotal = birzhaPrice * effectiveQty;
+    const diff        = (birzhaPrice > 0 && costPerUnit > 0) ? birzhaPrice - costPerUnit : null;
     const diffLabel   = diff !== null ? (diff >= 0 ? '💰 Доход' : '📉 Убыток') : '';
+    const diffTotal   = diff !== null ? diff * effectiveQty : null;
 
     const margin      = (diff !== null && birzhaPrice > 0) ? diff / birzhaPrice * 100 : null;
-    const roi         = (diff !== null && unitCost > 0)    ? diff / unitCost * 100 : null;
+    const roi         = (diff !== null && costPerUnit > 0)  ? diff / costPerUnit * 100 : null;
 
     const diffClass   = diff === null ? '' : (diff >= 0 ? 'saving' : 'loss');
     const diffSign    = diff !== null ? (diff >= 0 ? '+' : '') : '';
@@ -750,17 +756,29 @@ function buildExpandHTML(item, qty) {
     const finHTML = `<div class="expand-section">
         <div class="expand-section-title">💹 Финансовые показатели${effectiveQty > 1 ? ' (×' + effectiveQty + ' шт.)' : ''}</div>
         <div class="fin-grid">
-            ${unitCost > 0 ? `<div class="fin-row">
-                <span class="fin-label">🔨 Крафт${item.hasDiscount && discount > 0 ? ` (скидка ${discount}%)` : ''}</span>
-                <span class="fin-value">${fmt(unitCost)} 🪙</span>
+            ${costPerUnit > 0 ? `<div class="fin-row">
+                <span class="fin-label">🔨 Крафт (1 шт.)${item.hasDiscount && discount > 0 ? ` (скидка ${discount}%)` : ''}</span>
+                <span class="fin-value">${fmt(costPerUnit)} 🪙</span>
+            </div>` : ''}
+            ${effectiveQty > 1 && costPerUnit > 0 ? `<div class="fin-row">
+                <span class="fin-label">🔨 Крафт (×${effectiveQty} шт.)</span>
+                <span class="fin-value">${fmt(totalCostTotal)} 🪙</span>
             </div>` : ''}
             ${birzhaPrice > 0 ? `<div class="fin-row">
-                <span class="fin-label">📈 Биржа</span>
+                <span class="fin-label">📈 Биржа (1 шт.)</span>
                 <span class="fin-value">${fmt(birzhaPrice)} 🪙</span>
             </div>` : ''}
+            ${effectiveQty > 1 && birzhaPrice > 0 ? `<div class="fin-row">
+                <span class="fin-label">📈 Биржа (×${effectiveQty} шт.)</span>
+                <span class="fin-value">${fmt(birzhaTotal)} 🪙</span>
+            </div>` : ''}
             ${diff !== null ? `<div class="fin-row">
-                <span class="fin-label">${diffLabel}</span>
+                <span class="fin-label">${diffLabel} (1 шт.)</span>
                 <span class="fin-value ${diffClass}">${diffSign}${fmt(diff)} 🪙</span>
+            </div>` : ''}
+            ${diffTotal !== null && effectiveQty > 1 ? `<div class="fin-row">
+                <span class="fin-label">${diffLabel} (×${effectiveQty} шт.)</span>
+                <span class="fin-value ${diffClass}">${diffSign}${fmt(diffTotal)} 🪙</span>
             </div>` : ''}
             ${margin !== null ? `<div class="fin-row">
                 <span class="fin-label">📊 Маржа</span>
@@ -773,15 +791,20 @@ function buildExpandHTML(item, qty) {
         </div>
     </div>`;
 
+    // Строки таблицы: показываем количество на 1 единицу товара × effectiveQty
     const tableRows = rows.map(r => {
-        const meta     = RES_LABELS_CRAFT[r.col] || { label: r.col, emoji: '📦' };
-        const amtPerUnit = r.amount / itemQty;
-        const barW     = Math.max(1, Math.round(r.share));
-        const unitStr  = r.unitPrice > 0 ? r.unitPrice.toLocaleString('ru-RU', {maximumFractionDigits:2}) + ' 🪙' : '—';
-        const totalPerUnit = r.totalPrice / itemQty;
-        const totalStr = totalPerUnit > 0 ? Math.round(totalPerUnit).toLocaleString('ru-RU') + ' 🪙' : '—';
-        const amtStr = amtPerUnit > 0
-            ? (Number.isInteger(amtPerUnit) ? amtPerUnit.toLocaleString('ru-RU') : amtPerUnit.toLocaleString('ru-RU', { maximumFractionDigits: 4 }))
+        const meta         = RES_LABELS_CRAFT[r.col] || { label: r.col, emoji: '📦' };
+        // Количество ресурса на 1 единицу товара
+        const amtPerUnit   = r.amtOneCraft / itemQty;
+        // Итоговое количество ресурса для effectiveQty единиц
+        const amtTotal     = amtPerUnit * effectiveQty;
+        const barW         = Math.max(1, Math.round(r.share));
+        const unitStr      = r.unitPrice > 0 ? r.unitPrice.toLocaleString('ru-RU', {maximumFractionDigits:2}) + ' 🪙' : '—';
+        // Итоговая стоимость ресурса для effectiveQty единиц
+        const totalResPrice = (r.totalPriceOneCraft / itemQty) * effectiveQty;
+        const totalStr      = totalResPrice > 0 ? Math.round(totalResPrice).toLocaleString('ru-RU') + ' 🪙' : '—';
+        const amtStr = amtTotal > 0
+            ? (Number.isInteger(amtTotal) ? amtTotal.toLocaleString('ru-RU') : amtTotal.toLocaleString('ru-RU', { maximumFractionDigits: 4 }))
             : '—';
         return `<tr>
             <td>${meta.emoji} ${meta.label}</td>
@@ -797,12 +820,12 @@ function buildExpandHTML(item, qty) {
         </tr>`;
     }).join('');
 
-    const totalPerUnitStr = costPerUnit > 0 ? Math.round(costPerUnit).toLocaleString('ru-RU') + ' 🪙' : '—';
-    const titleSuffix = costPerUnit > 0 ? ` (${totalPerUnitStr})` : '';
+    const totalStr    = totalCostTotal > 0 ? Math.round(totalCostTotal).toLocaleString('ru-RU') + ' 🪙' : '—';
+    const titleSuffix = totalCostTotal > 0 ? ` (${totalStr})` : '';
 
     return `<div class="craft-expand-inner">
         <div class="expand-section">
-            <div class="expand-section-title">📊 Структура себестоимости${titleSuffix}${qtyInfo}</div>
+            <div class="expand-section-title">📊 Структура себестоимости${titleSuffix}${effectiveQty > 1 ? ' ×' + effectiveQty + ' шт.' : ''}${qtyInfo}</div>
             <div class="expand-table-wrap">
                 <table class="expand-table">
                     <thead>
@@ -818,7 +841,7 @@ function buildExpandHTML(item, qty) {
                     <tfoot>
                         <tr>
                             <td colspan="3">Итого</td>
-                            <td class="num">${totalPerUnitStr}</td>
+                            <td class="num">${totalStr}</td>
                             <td></td>
                         </tr>
                     </tfoot>
@@ -853,7 +876,6 @@ function filtered() {
         (!searchQuery || item.name.toLowerCase().includes(searchQuery))
     );
 
-    // Фильтр по окупаемости
     if (roiFilter !== 'all') {
         items = items.filter(item => {
             const unitCost = getUnitCost(item, discount);
@@ -893,13 +915,11 @@ function renderCard(item) {
     const expanded = isExp ? ' expanded' : '';
     const favClass = isFav ? ' favorited' : '';
 
-    // Блок ресурсов в шапке
     const resItems = Object.entries(item.res || {}).filter(([,v]) => v > 0).map(([k,v]) => {
         const meta = RES_LABELS_CRAFT[k] || { label: k, emoji: '📦' };
         return `<div class="res-item" title="${meta.label}"><span class="res-emoji">${meta.emoji}</span><span class="res-label">${meta.label}</span><span class="res-value">${v.toLocaleString('ru-RU')}</span></div>`;
     }).join('');
 
-    // ===== БЛОК ЦЕН: КРАФТ / БИРЖА / ДОХОД (или УБЫТОК) =====
     const unitCost      = getUnitCost(item, discount);
     const birzhaPrice   = item.cost || 0;
     const diff          = (birzhaPrice > 0 && unitCost > 0) ? birzhaPrice - unitCost : null;
@@ -930,7 +950,6 @@ function renderCard(item) {
         </div>`;
     }
 
-    // Footer: итог количества
     const effectiveCost = unitCost > 0 ? unitCost : item.cost;
     const lineTotal = qty > 0
         ? `<span class="total-sum">×${qty} = <span>${fmt(effectiveCost * qty)} 🪙</span></span>`
@@ -966,7 +985,6 @@ function render() {
     const items = filtered();
     document.getElementById('item-count').textContent = items.length;
 
-    // Экономия
     const savEl = document.getElementById('total-saving');
     if (discount > 0) {
         const saving = items.filter(i => i.hasDiscount)
@@ -995,7 +1013,6 @@ function render() {
         </div>`;
     }).join('');
 
-    // Навешиваем обработчики клика по карточке
     document.querySelectorAll('.craft-card').forEach(card => {
         card.addEventListener('click', () => toggleExpand(card.dataset.name));
     });
@@ -1055,11 +1072,9 @@ function refreshCardFooter(name) {
     const unitCost      = getUnitCost(item, discount);
     const effectiveCost = unitCost > 0 ? unitCost : item.cost;
 
-    // Обновить input
     const inp = card.querySelector('.quantity-control input');
     if (inp) inp.value = qty;
 
-    // Обновить итог
     const footer = card.querySelector('.craft-footer');
     if (footer) {
         const lastEl = footer.lastElementChild;
@@ -1084,7 +1099,7 @@ function refreshCardFooter(name) {
         }
     }
 
-    // Обновить expand если открыт
+    // Обновляем expand с учётом нового количества
     if (expandedCards.has(name)) {
         const expandDiv = card.querySelector('.craft-expand');
         if (expandDiv) expandDiv.innerHTML = buildExpandHTML(item, Math.max(qty, 1));
@@ -1198,7 +1213,6 @@ async function init() {
     loader.style.display = 'none';
     cont.style.display   = 'block';
 
-    // Кнопки категорий
     const catCont = document.getElementById('cat-filters');
     CATS_ORDER.forEach(c => {
         const btn = document.createElement('button');
@@ -1213,17 +1227,14 @@ async function init() {
         catCont.appendChild(btn);
     });
 
-    // Слайдер скидки
     document.getElementById('discount-slider').addEventListener('input', e => setDiscount(e.target.value));
     document.querySelectorAll('.preset-btn').forEach(b => b.addEventListener('click', () => setDiscount(b.dataset.val)));
 
-    // Поиск
     document.getElementById('search-input').addEventListener('input', function() {
         searchQuery = this.value.toLowerCase().trim();
         render();
     });
 
-    // Сортировка
     document.getElementById('sort-desc').addEventListener('click', function() {
         sortOrder = sortOrder === 'desc' ? null : 'desc';
         if (sortOrder === 'desc') sortOrderRoi = null;
@@ -1235,7 +1246,7 @@ async function init() {
     document.getElementById('sort-asc').addEventListener('click', function() {
         sortOrder = sortOrder === 'asc' ? null : 'asc';
         if (sortOrder === 'asc') sortOrderRoi = null;
-        this.classList.toggle('active', sortOrder === 'asc')
+        this.classList.toggle('active', sortOrder === 'asc');
         document.getElementById('sort-desc').classList.remove('active');
         if (sortOrder === null) { document.getElementById('sort-roi-desc').classList.remove('active'); document.getElementById('sort-roi-asc').classList.remove('active'); }
         render();
@@ -1259,7 +1270,6 @@ async function init() {
         render();
     });
 
-    // Окупаемость
     document.getElementById('roi-all').addEventListener('click', function() {
         roiFilter = 'all';
         document.querySelectorAll('#roi-filters .sort-btn').forEach(b => b.classList.remove('active'));
@@ -1279,7 +1289,6 @@ async function init() {
         render();
     });
 
-    // Сброс
     document.getElementById('btn-reset').addEventListener('click', () => {
         activeCategory = null; searchQuery = ''; sortOrder = null; sortOrderRoi = null;
         roiFilter = 'all';
@@ -1290,7 +1299,6 @@ async function init() {
         document.getElementById('roi-all').classList.add('active');
     });
 
-    // Очистить калькулятор
     document.getElementById('calc-clear').addEventListener('click', () => {
         quantities = {};
         render();
