@@ -1,1 +1,1289 @@
-fixed
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Крафт — WOSB Wiki</title>
+    <meta name="description" content="Рецепты крафта World of Sea Battle: мастерские, переработка, расходные предметы">
+    <link rel="stylesheet" href="css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        /* ===== КАРТОЧКА ===== */
+        .craft-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 0;
+            display: grid;
+            grid-template-columns: 56px 1fr;
+            transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+            overflow: hidden;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .craft-card:hover {
+            border-color: var(--accent);
+            background: var(--bg-hover);
+        }
+
+        .craft-card.expanded {
+            border-color: var(--accent2);
+            box-shadow: 0 0 0 1px rgba(42,159,214,0.2), 0 4px 20px rgba(0,0,0,0.3);
+        }
+
+        .craft-card.expanded.favorited {
+            border-color: var(--gold);
+            box-shadow: 0 0 0 1px rgba(201,162,39,0.3), 0 4px 20px rgba(0,0,0,0.3);
+        }
+
+        .craft-card.favorited {
+            border-color: var(--gold);
+            background: linear-gradient(135deg, rgba(201,162,39,0.15), rgba(201,162,39,0.05));
+        }
+
+        .craft-card.favorited:hover {
+            border-color: var(--gold-light);
+            background: linear-gradient(135deg, rgba(201,162,39,0.2), rgba(201,162,39,0.1));
+        }
+
+        .craft-icon {
+            width: 56px;
+            height: 56px;
+            background: linear-gradient(135deg, var(--bg-dark), rgba(30,111,168,0.2));
+            border-right: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            grid-row: 1;
+        }
+
+        .craft-info {
+            padding: 9px 12px;
+            min-width: 0;
+        }
+
+        .craft-header-row {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 6px;
+        }
+
+        .craft-name {
+            font-size: 13px;
+            font-weight: 600;
+            color: #e8f4ff;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            flex-shrink: 1;
+            min-width: 0;
+        }
+
+        .expand-chevron {
+            font-size: 10px;
+            color: var(--text-muted);
+            transition: transform 0.35s cubic-bezier(0.4,0,0.2,1);
+            flex-shrink: 0;
+        }
+
+        .craft-card.expanded .expand-chevron {
+            transform: rotate(180deg);
+            color: var(--accent2);
+        }
+
+        /* ===== БЛОК ЦЕН ===== */
+        .craft-prices-row {
+            display: flex;
+            align-items: stretch;
+            flex-shrink: 0;
+            margin-left: auto;
+            background: rgba(0,0,0,0.22);
+            border-radius: 7px;
+            border: 1px solid var(--border);
+            overflow: hidden;
+        }
+
+        .price-cell {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 1px;
+            padding: 3px 9px;
+        }
+
+        .price-cell + .price-cell { border-left: 1px solid var(--border); }
+
+        .price-cell-label {
+            font-size: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            color: var(--text-muted);
+            font-weight: 600;
+            white-space: nowrap;
+            line-height: 1;
+        }
+
+        .price-cell-value {
+            font-size: 11px;
+            font-weight: 700;
+            white-space: nowrap;
+            line-height: 1.3;
+        }
+
+        .price-cell-value.cost    { color: var(--gold-light); }
+        .price-cell-value.saving  { color: #4ade80; }
+        .price-cell-value.loss    { color: #f87171; }
+        .price-cell-value.na      { color: var(--text-muted); font-style: italic; font-size: 10px; }
+
+        /* ===== РЕСУРСЫ В ШАПКЕ ===== */
+        .craft-res-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+        }
+
+        /* ===== FOOTER КАРТОЧКИ ===== */
+        .craft-footer {
+            grid-column: 1 / -1;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 7px 11px;
+            background: rgba(0,0,0,0.2);
+            border-top: 1px solid var(--border);
+        }
+
+        .fav-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 17px;
+            color: var(--text-muted);
+            transition: all 0.2s;
+            padding: 2px 4px;
+        }
+
+        .fav-btn:hover { color: var(--gold); transform: scale(1.2); }
+
+        .quantity-control {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 2px;
+        }
+
+        .quantity-control input {
+            width: 60px;
+            background: rgba(255,255,255,0.05);
+            border: none;
+            color: var(--gold-light);
+            text-align: center;
+            font-size: 12px;
+            font-weight: 700;
+            padding: 2px;
+        }
+
+        .quantity-control input:focus { outline: none; background: rgba(255,255,255,0.1); }
+
+        .quantity-control button {
+            width: 22px;
+            height: 22px;
+            border-radius: 4px;
+            background: rgba(255,255,255,0.1);
+            border: none;
+            color: #e8f4ff;
+            cursor: pointer;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .quantity-control button:hover { background: var(--accent); }
+
+        .total-sum {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .total-sum span { color: var(--gold); }
+
+        /* ===== РАСКРЫТИЕ ===== */
+        .craft-expand {
+            grid-column: 1 / -1;
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.45s cubic-bezier(0.4,0,0.2,1), opacity 0.3s ease;
+            opacity: 0;
+        }
+
+        .craft-card.expanded .craft-expand {
+            max-height: 800px;
+            opacity: 1;
+        }
+
+        .craft-expand-inner {
+            border-top: 1px solid var(--border);
+            background: rgba(0,0,0,0.22);
+            padding: 14px 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        @media (min-width: 680px) {
+            .craft-expand-inner { flex-direction: row; align-items: flex-start; }
+            .expand-section { flex: 1; min-width: 0; }
+        }
+
+        .expand-section-title {
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            color: var(--accent2);
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .expand-table-wrap { overflow-x: auto; }
+
+        .expand-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+        }
+
+        .expand-table th {
+            color: var(--text-muted);
+            font-weight: 600;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            padding: 4px 8px;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+            white-space: nowrap;
+        }
+
+        .expand-table td {
+            padding: 5px 8px;
+            border-bottom: 1px solid rgba(255,255,255,0.04);
+            color: #c8d8e8;
+            white-space: nowrap;
+        }
+
+        .expand-table tfoot td {
+            border-top: 1px solid var(--border);
+            border-bottom: none;
+            padding-top: 8px;
+            color: var(--gold-light);
+            font-weight: 700;
+        }
+
+        .expand-table td.num {
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .share-bar-wrap { display: flex; align-items: center; gap: 5px; min-width: 70px; }
+
+        .share-bar-track {
+            flex: 1;
+            height: 4px;
+            background: rgba(255,255,255,0.08);
+            border-radius: 2px;
+            overflow: hidden;
+            min-width: 32px;
+        }
+
+        .share-bar {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent), var(--accent2));
+            border-radius: 2px;
+            transition: width 0.4s ease;
+        }
+
+        .share-pct { font-size: 10px; color: var(--text-muted); min-width: 26px; text-align: right; }
+
+        /* ===== ФИНАНСОВЫЙ БЛОК ===== */
+        .fin-grid { display: flex; flex-direction: column; gap: 5px; }
+
+        .fin-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            font-size: 12px;
+            padding: 5px 8px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 5px;
+            border: 1px solid rgba(255,255,255,0.04);
+        }
+
+        .fin-label { color: var(--text-muted); white-space: nowrap; }
+
+        .fin-value {
+            font-weight: 700;
+            color: var(--gold-light);
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .fin-value.saving { color: #4ade80; }
+        .fin-value.loss   { color: #f87171; }
+
+        /* ===== КАЛЬКУЛЯТОР ===== */
+        .craft-calculator {
+            background: linear-gradient(135deg, rgba(74,222,128,0.08), rgba(201,162,39,0.08));
+            border: 1px solid rgba(74,222,128,0.25);
+            border-radius: 10px;
+            padding: 10px 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .calc-label { font-size: 12px; font-weight: 600; color: #4ade80; }
+        .calc-value { font-size: 16px; font-weight: 700; color: var(--gold-light); }
+
+        .calc-clear-btn {
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            background: rgba(248,113,113,0.15);
+            border: 1px solid rgba(248,113,113,0.35);
+            color: #f87171;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .calc-clear-btn:hover { background: rgba(248,113,113,0.25); border-color: #f87171; }
+
+        /* ===== СЕКЦИИ ===== */
+        .type-section { margin-bottom: 28px; }
+
+        .type-header {
+            font-family: 'Cinzel', serif;
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--accent2);
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .type-header::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: var(--border);
+        }
+
+        /* ===== СЛАЙДЕР СКИДКИ ===== */
+        .discount-block {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 16px 22px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 18px;
+        }
+
+        .discount-block-title { font-size: 13px; font-weight: 600; color: var(--text); white-space: nowrap; }
+
+        .discount-block-info { font-size: 11px; color: var(--text-muted); display: flex; flex-direction: column; gap: 2px; }
+
+        .discount-slider-wrap { display: flex; align-items: center; gap: 14px; flex: 1; min-width: 200px; }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            height: 4px;
+            background: var(--border);
+            border-radius: 2px;
+            outline: none;
+            cursor: pointer;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px; height: 18px;
+            border-radius: 50%;
+            background: var(--accent2);
+            border: 2px solid var(--bg-dark);
+            cursor: pointer;
+            box-shadow: 0 0 8px rgba(42,159,214,0.5);
+            transition: transform 0.15s;
+        }
+
+        input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+
+        .discount-value { font-size: 22px; font-weight: 800; color: var(--gold); min-width: 52px; text-align: center; transition: color 0.2s; }
+        .discount-value.max { color: #f87171; }
+
+        .discount-presets { display: flex; gap: 6px; flex-wrap: wrap; }
+
+        .preset-btn {
+            background: var(--bg-dark);
+            border: 1px solid var(--border);
+            border-radius: 7px;
+            color: var(--text-muted);
+            padding: 5px 12px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .preset-btn:hover, .preset-btn.active { background: rgba(42,159,214,0.12); border-color: var(--accent2); color: var(--accent2); }
+        .preset-btn.active { background: rgba(42,159,214,0.2); }
+
+        /* ===== СОРТИРОВКА ===== */
+        .sort-buttons { display: flex; gap: 4px; }
+
+        .sort-btn {
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .sort-btn:hover { background: rgba(255,255,255,0.1); color: #e8f4ff; }
+        .sort-btn.active { background: rgba(42,159,214,0.2); border-color: var(--accent2); color: var(--accent2); }
+
+        .data-source { font-size: 11px; padding: 3px 8px; border-radius: 5px; font-weight: 600; }
+        .data-source.live { background: rgba(74,222,128,0.1); color: #4ade80; border: 1px solid rgba(74,222,128,0.25); }
+        .data-source.local { background: rgba(201,162,39,0.1); color: var(--gold); border: 1px solid rgba(201,162,39,0.3); }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .craft-card.lifted { animation: liftCard 0.5s ease-out; }
+        @keyframes liftCard { 0% { transform: translateY(10px); opacity: 0.5; } 100% { transform: translateY(0); opacity: 1; } }
+    </style>
+</head>
+
+<body>
+    <header>
+        <div class="header-inner">
+            <a href="index.html" class="logo"><span class="logo-anchor">⚓</span> WOSB Wiki</a>
+            <nav>
+                <a href="index.html">🚢 <span class="nav-text">Корабли</span></a>
+                <a href="craft.html" class="active">🔨 <span class="nav-text">Крафт</span></a>
+                <a href="calculator.html">🧮 <span class="nav-text">Калькулятор</span></a>
+                <a href="guns.html">💣 <span class="nav-text">Орудия</span></a>
+            </nav>
+        </div>
+    </header>
+
+    <main>
+        <div class="page-header">
+            <div>
+                <h1 class="page-title">🔨 Крафт</h1>
+                <p class="page-subtitle">Рецепты мастерских, переработки, расходных предметов и боеприпасов</p>
+            </div>
+            <div class="craft-calculator" id="craft-calculator">
+                <div class="calc-label">🧮 Итого:</div>
+                <div class="calc-value" id="calc-total">0 🪙</div>
+                <div style="font-size:11px;color:var(--text-muted)" id="calc-discount-note"></div>
+                <button class="calc-clear-btn" id="calc-clear">Очистить</button>
+            </div>
+        </div>
+
+        <!-- Слайдер скидки -->
+        <div class="discount-block">
+            <div>
+                <div class="discount-block-title">🏷️ Скидка на крафт</div>
+                <div class="discount-block-info">
+                    <span>Зависит от фракции, порта, уровня мастерской и ивентов</span>
+                    <span>Максимально возможная скидка — <strong style="color:var(--gold-light)">35%</strong></span>
+                </div>
+            </div>
+            <div class="discount-slider-wrap">
+                <input type="range" id="discount-slider" min="0" max="35" step="5" value="0">
+                <div class="discount-value" id="discount-display">0%</div>
+            </div>
+            <div>
+                <div class="discount-block-info" style="margin-bottom:6px"><span>Быстрый выбор</span></div>
+                <div class="discount-presets">
+                    <button class="preset-btn active" data-val="0">0%</button>
+                    <button class="preset-btn" data-val="5">5%</button>
+                    <button class="preset-btn" data-val="10">10%</button>
+                    <button class="preset-btn" data-val="15">15%</button>
+                    <button class="preset-btn" data-val="20">20%</button>
+                    <button class="preset-btn" data-val="25">25%</button>
+                    <button class="preset-btn" data-val="30">30%</button>
+                    <button class="preset-btn" data-val="35">35% 🔥</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="filters" style="margin-bottom:24px;">
+            <div class="filter-group">
+                <div class="filter-label">🔍 Поиск</div>
+                <input type="text" id="search-input" placeholder="Название предмета...">
+            </div>
+            <div class="filter-group">
+                <div class="filter-label">📋 Категория</div>
+                <div class="btn-group" id="cat-filters"></div>
+            </div>
+            <div class="filter-group">
+                <div class="filter-label">📊 Окупаемость</div>
+                <div class="sort-buttons" id="roi-filters">
+                    <button class="sort-btn active" id="roi-all" title="Все предметы">Все</button>
+                    <button class="sort-btn" id="roi-profit" title="Окупаемые (ROI > 0)">Окупаемые</button>
+                    <button class="sort-btn" id="roi-loss" title="Убыточные (ROI < 0)">Убыточные</button>
+                </div>
+            </div>
+            <div class="filter-group">
+                <div class="filter-label">↕ Сортировка</div>
+                <div class="sort-buttons">
+                    <button class="sort-btn" id="sort-desc">↓ Дорогие</button>
+                    <button class="sort-btn" id="sort-asc">↑ Дешёвые</button>
+                    <button class="sort-btn" id="sort-roi-desc">↓ ROI</button>
+                    <button class="sort-btn" id="sort-roi-asc">↑ ROI</button>
+                </div>
+            </div>
+            <button class="btn-reset" id="btn-reset">↺ Сбросить</button>
+        </div>
+
+        <div class="stats-bar">
+            <div class="stat-chip">Найдено: <span id="item-count">0</span> рецептов</div>
+            <div class="stat-chip" id="total-saving" style="display:none">
+                Экономия: <span id="saving-val" style="color:#4ade80;font-weight:700"></span>
+            </div>
+            <div class="stat-chip" id="src-indicator"></div>
+        </div>
+
+        <div id="loader" style="text-align:center;padding:60px;color:var(--text-muted)">
+            <span style="font-size:32px;display:block;margin-bottom:12px;animation:spin 1s linear infinite">⚓</span>
+            Загружаем данные...
+        </div>
+        <div id="craft-container" style="display:none"></div>
+    </main>
+
+<script src="js/config.js"></script>
+<script>
+// ===== КОНСТАНТЫ =====
+const RES_LABELS_CRAFT = {
+    wood:          { label: 'Дерево',           emoji: '🪵' },
+    iron:          { label: 'Железо',           emoji: '⚙️' },
+    copper:        { label: 'Медь',             emoji: '🔶' },
+    bronze:        { label: 'Бронза',           emoji: '🥉' },
+    coal:          { label: 'Уголь',            emoji: '⬛' },
+    tar:           { label: 'Смола',            emoji: '🫙' },
+    cloth:         { label: 'Ткань',            emoji: '🧵' },
+    sail:          { label: 'Парусина',         emoji: '⛵' },
+    plate_res:     { label: 'Пластина',         emoji: '🔘' },
+    iron_ore:      { label: 'Железная руда',    emoji: '🪨' },
+    copper_ore:    { label: 'Медная руда',      emoji: '🟤' },
+    debris:        { label: 'Обломки',          emoji: '🗑️' },
+    animals:       { label: 'Животные',         emoji: '🐄' },
+    gold:          { label: 'Золото',           emoji: '💰' },
+    battle_mark:   { label: 'Боевая марка',     emoji: '⚔️' },
+    blueprint_frag:{ label: 'Фрагмент чертежа', emoji: '📜' },
+    rum:           { label: 'Ром',              emoji: '🍺' },
+    supplies:      { label: 'Припасы',          emoji: '📦' },
+    fish:          { label: 'Рыба',             emoji: '🐟' },
+    fresh_meat:    { label: 'Свежее мясо',      emoji: '🥩' },
+    whale_oil:     { label: 'Китовый жир',      emoji: '🐋' },
+    voodoo_skull:  { label: 'Череп Вуду',       emoji: '💀' },
+};
+
+// Маппинг колонки → название в таблице resources
+const RES_COL_TO_NAME = {
+    wood:          'Дерево',
+    iron:          'Железо',
+    copper:        'Медь',
+    bronze:        'Бронза',
+    coal:          'Уголь',
+    tar:           'Смола',
+    cloth:         'Ткань',
+    sail:          'Парусина',
+    plate_res:     'Пластина',
+    iron_ore:      'Железная руда',
+    copper_ore:    'Медная руда',
+    debris:        'Обломки',
+    animals:       'Животные',
+    gold:          'Золото',
+    battle_mark:   'Боевая марка',
+    rum:           'Ром',
+    supplies:      'Припасы',
+    fish:          'Рыба',
+    fresh_meat:    'Свежее мясо',
+    whale_oil:     'Китовый жир',
+};
+
+const DB_RES_COLS = Object.keys(RES_LABELS_CRAFT);
+
+const CAT_ICONS = {
+    'Мастерские': '🏭', 'Переработка': '♻️',
+    'Расходные предметы': '🎒', 'Разное': '📦'
+};
+const CATS_ORDER = ['Мастерские', 'Переработка', 'Расходные предметы', 'Разное'];
+
+const ITEM_ICONS = {
+    'Балка':'🔩','Бронза':'🥉','Пластина':'🔘','Парусина':'⛵','Переборка':'🛡️',
+    'Железо':'⚙️','Медь':'🔶','Уголь':'⬛','Свежее мясо':'🥩','50 Ткани + 1 Кожа':'🧵',
+    'Сундук':'📦','Имперский чертеж':'📋','Порцион':'🥘','Снасти':'🔗',
+    'Чугунные ядра':'⚫','Брандскугели':'🔴','Бомбы осколочные':'💥',
+    'Малые поджигающие бочки':'🛢️','Большие осколочные мины':'💣',
+    'Деревяные заплатки':'🪵','Железные заплатки':'⚙️','Бронзовые заплатки':'🥉',
+    'Заплатки из обломков':'🗑️','Деревянные ремонт-набор':'🪵','Железные ремонт-набор':'⚙️',
+    'Бронзовый ремонт-набор':'🥉','Походный рацион':'🎒','Малые добавочные паруса':'⛵',
+    'Большие добавочные паруса':'⛵','Малые пластины':'🔘','Большие пластины':'🔘',
+    'Дымовая бомба':'💨','Дымовая завеса':'💨','Подкуп':'💀',
+    'Черные двойной порох':'⬛','Красный двойной порох':'🔴','Белый двойной порох':'⬜',
+    'Ром-паёк':'🍺','Сытный паёк':'🍖','Фосфор':'🟡','Пороховой заряд':'💥',
+    'Крюк Посейдона':'🪝','Сигнальная ракета Синяя':'🔵',
+    'Сигнальная ракета Красная':'🔴','Сигнальная ракета Желтая':'🟡','Горн':'📯',
+};
+
+// ===== СОСТОЯНИЕ (in-memory, без localStorage) =====
+let ALL_ITEMS     = [];
+let ALL_RESOURCES = [];
+let quantities    = {};
+let favorites     = {};
+let expandedCards = new Set();
+
+let activeCategory = null;
+let searchQuery    = '';
+let sortOrder      = null; // 'asc' | 'desc' | null
+let sortOrderRoi   = null; // 'roi-asc' | 'roi-desc' | null
+let discount       = 0;
+let roiFilter      = 'all'; // 'all' | 'profit' | 'loss'
+
+// ===== ЦЕНЫ РЕСУРСОВ =====
+function getUnitPrice(col) {
+    const resName = RES_COL_TO_NAME[col];
+    if (!resName) return 0;
+    const r = ALL_RESOURCES.find(x => x.name === resName);
+    if (!r) return 0;
+    return r.is_base ? Number(r.cost_avg) : Number(r.cost_calc);
+}
+
+// ===== СЕБЕСТОИМОСТЬ КРАФТА ИЗ РЕСУРСОВ =====
+function calcCraftCost(item, disc) {
+    const effectiveDisc = item.hasDiscount ? disc : 0;
+    return Object.entries(item.res || {})
+        .filter(([, v]) => v > 0)
+        .reduce((sum, [col, amt]) => {
+            const effectiveAmt = effectiveDisc > 0 ? Math.floor(amt * (1 - effectiveDisc / 100)) : amt;
+            return sum + effectiveAmt * getUnitPrice(col);
+        }, 0);
+}
+
+function getUnitCost(item, disc) {
+    const batchCost = calcCraftCost(item, disc);
+    return batchCost / (item.quantity || 1);
+}
+
+// ===== ТАБЛИЦА СЕБЕСТОИМОСТИ =====
+// qty — количество штук из контрола
+function buildExpandHTML(item, qty) {
+    const effectiveQty = Math.max(qty || 1, 1);
+    const itemQty      = item.quantity || 1;
+    const craftEntries = Object.entries(item.res || {}).filter(([,v]) => v > 0);
+
+    if (!craftEntries.length) {
+        return `<div class="craft-expand-inner"><span style="color:var(--text-muted);font-size:12px">Нет данных о ресурсах</span></div>`;
+    }
+
+    const effectiveDisc = item.hasDiscount ? discount : 0;
+    const totalCrafts   = Math.ceil(effectiveQty / itemQty);
+
+    const resRows = craftEntries.map(([col, baseAmt]) => {
+        const effectiveAmt = effectiveDisc > 0 ? Math.floor(baseAmt * (1 - effectiveDisc / 100)) : baseAmt;
+        const totalAmt     = effectiveAmt * totalCrafts;
+        const unitPrice    = getUnitPrice(col);
+        const totalCost    = totalAmt * unitPrice;
+        const share        = totalCost / calcCraftCost(item, discount) * 100;
+        const meta = RES_LABELS_CRAFT[col] || { label: col, emoji: '📦' };
+
+        return { col, meta, effectiveAmt, totalAmt, unitPrice, totalCost, share };
+    });
+
+    const totalCostBatch = calcCraftCost(item, discount);
+    const totalCostAll   = totalCostBatch * totalCrafts;
+    const birzhaPrice    = item.cost || 0;
+    const unitCost       = getUnitCost(item, discount);
+    const diff           = (birzhaPrice > 0 && unitCost > 0) ? birzhaPrice - unitCost : null;
+    const roiVal         = diff !== null ? (diff / unitCost * 100) : null;
+
+    const resTableRows = resRows.map(r => `
+        <tr>
+            <td>${r.meta.emoji} ${r.meta.label}</td>
+            <td class="num">${r.effectiveAmt.toLocaleString('ru-RU')}</td>
+            <td class="num">${r.totalAmt.toLocaleString('ru-RU')}</td>
+            <td class="num">${r.unitPrice > 0 ? fmt(r.unitPrice) + ' 🪙' : '—'}</td>
+            <td class="num">${r.unitPrice > 0 ? fmt(r.totalCost) + ' 🪙' : '—'}</td>
+            <td>
+                <div class="share-bar-wrap">
+                    <div class="share-bar-track"><div class="share-bar" style="width:${Math.min(r.share,100).toFixed(0)}%"></div></div>
+                    <span class="share-pct">${r.share.toFixed(0)}%</span>
+                </div>
+            </td>
+        </tr>`).join('');
+
+    const finHTML = `
+        <div class="fin-grid">
+            ${unitCost > 0 ? `<div class="fin-row"><span class="fin-label">Себестоимость (1 шт)</span><span class="fin-value">${fmt(unitCost)} 🪙</span></div>` : ''}
+            ${unitCost > 0 && totalCrafts > 1 ? `<div class="fin-row"><span class="fin-label">Себестоимость (${effectiveQty} шт)</span><span class="fin-value">${fmt(unitCost * effectiveQty)} 🪙</span></div>` : ''}
+            ${birzhaPrice > 0 ? `<div class="fin-row"><span class="fin-label">Цена на бирже (1 шт)</span><span class="fin-value">${fmt(birzhaPrice)} 🪙</span></div>` : ''}
+            ${diff !== null ? `<div class="fin-row"><span class="fin-label">${diff >= 0 ? 'Доход' : 'Убыток'} (1 шт)</span><span class="fin-value ${diff >= 0 ? 'saving' : 'loss'}">${diff >= 0 ? '+' : ''}${fmt(diff)} 🪙</span></div>` : ''}
+            ${roiVal !== null ? `<div class="fin-row"><span class="fin-label">ROI</span><span class="fin-value ${roiVal >= 0 ? 'saving' : 'loss'}">${roiVal >= 0 ? '+' : ''}${roiVal.toFixed(1)}%</span></div>` : ''}
+            ${item.hasDiscount && effectiveDisc > 0 ? `<div class="fin-row"><span class="fin-label">Скидка на крафт</span><span class="fin-value saving">−${effectiveDisc}%</span></div>` : ''}
+        </div>`;
+
+    return `<div class="craft-expand-inner">
+        <div class="expand-section">
+            <div class="expand-section-title">📦 Ресурсы <span style="color:var(--text-muted);font-weight:400">(${totalCrafts} крафт${totalCrafts > 1 ? 'а' : ''})</span></div>
+            <div class="expand-table-wrap">
+                <table class="expand-table">
+                    <thead>
+                        <tr>
+                            <th>Ресурс</th>
+                            <th>За крафт</th>
+                            <th>Всего</th>
+                            <th>Цена</th>
+                            <th>Стоимость</th>
+                            <th>Доля</th>
+                        </tr>
+                    </thead>
+                    <tbody>${resTableRows}</tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="4">Итого</td>
+                            <td class="num">${fmt(totalCostAll)} 🪙</td>
+                            <td></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+        <div class="expand-section">
+            <div class="expand-section-title">💰 Финансы</div>
+            ${finHTML}
+        </div>
+    </div>`;
+}
+
+// ===== КАЛЬКУЛЯТОР =====
+function updateCalcTotal() {
+    const total = Object.entries(quantities).reduce((sum, [name, qty]) => {
+        if (!qty) return sum;
+        const item = ALL_ITEMS.find(i => i.name === name);
+        if (!item) return sum;
+        const cost = getUnitCost(item, discount) || item.cost || 0;
+        return sum + cost * qty;
+    }, 0);
+    document.getElementById('calc-total').textContent = fmt(total) + ' 🪙';
+    const note = document.getElementById('calc-discount-note');
+    note.textContent = discount > 0 ? `(со скидкой ${discount}%)` : '';
+}
+
+// ===== РЕНДЕР =====
+function fmt(n) { return Math.round(n).toLocaleString('ru-RU'); }
+
+function filtered() {
+    let items = ALL_ITEMS.filter(item =>
+        (!activeCategory || item.cat === activeCategory) &&
+        (!searchQuery || item.name.toLowerCase().includes(searchQuery))
+    );
+
+    if (roiFilter !== 'all') {
+        items = items.filter(item => {
+            const unitCost = getUnitCost(item, discount);
+            const birzha   = item.cost || 0;
+            const roi      = (birzha > 0 && unitCost > 0) ? (birzha - unitCost) / unitCost : null;
+            if (roi === null) return false;
+            return roiFilter === 'profit' ? roi > 0 : roi < 0;
+        });
+    }
+    if (sortOrder === 'asc')  items = items.sort((a,b) => getUnitCost(a, discount) - getUnitCost(b, discount));
+    if (sortOrder === 'desc') items = items.sort((a,b) => getUnitCost(b, discount) - getUnitCost(a, discount));
+
+    if (sortOrderRoi === 'roi-desc' || sortOrderRoi === 'roi-asc') {
+        items = items.sort((a, b) => {
+            const roiA = getROI(a);
+            const roiB = getROI(b);
+            if (roiA === null && roiB === null) return 0;
+            if (roiA === null) return 1;
+            if (roiB === null) return -1;
+            return sortOrderRoi === 'roi-desc' ? roiB - roiA : roiA - roiB;
+        });
+    }
+    // ⭐ Избранные всегда в самом верху общего списка
+    items = [...items.filter(i => favorites[i.name]), ...items.filter(i => !favorites[i.name])];
+    return items;
+}
+
+function getROI(item) {
+    const unitCost = getUnitCost(item, discount);
+    const birzha    = item.cost || 0;
+    return (birzha > 0 && unitCost > 0) ? (birzha - unitCost) / unitCost : null;
+}
+
+function renderCard(item) {
+    const icon     = ITEM_ICONS[item.name] || '📦';
+    const qty      = quantities[item.name] || 0;
+    const isFav    = !!favorites[item.name];
+    const isExp    = expandedCards.has(item.name);
+    const expanded = isExp ? ' expanded' : '';
+    const favClass = isFav ? ' favorited' : '';
+
+    const resItems = Object.entries(item.res || {}).filter(([,v]) => v > 0).map(([k,v]) => {
+        const meta = RES_LABELS_CRAFT[k] || { label: k, emoji: '📦' };
+        return `<div class="res-item" title="${meta.label}"><span class="res-emoji">${meta.emoji}</span><span class="res-label">${meta.label}</span><span class="res-value">${v.toLocaleString('ru-RU')}</span></div>`;
+    }).join('');
+
+    const unitCost      = getUnitCost(item, discount);
+    const birzhaPrice   = item.cost || 0;
+    const diff          = (birzhaPrice > 0 && unitCost > 0) ? birzhaPrice - unitCost : null;
+    const diffLabel     = diff !== null ? (diff >= 0 ? 'Доход' : 'Убыток') : '';
+    const qtyBadge      = item.quantity > 1 ? `<span class="badge badge-type">📦 ${item.quantity} шт/крафт</span>` : '';
+
+    const timeBadge = item.time > 0 ? `<span class="badge badge-type">⏱ ${item.time} мин</span>` : '';
+    const discBadge = item.hasDiscount ? `<span class="badge" style="background:rgba(74,222,128,0.1);color:#4ade80;border:1px solid rgba(74,222,128,0.25)">🏷️ Скидка</span>` : '';
+
+    let pricesHTML = '';
+    if (unitCost > 0 || birzhaPrice > 0) {
+        const diffColor = diff === null ? '' : (diff >= 0 ? '#4ade80' : '#f87171');
+        const diffSign  = diff !== null ? (diff >= 0 ? '+' : '') : '';
+
+        pricesHTML = `<div class="craft-prices-row">
+            ${unitCost > 0 ? `<div class="price-cell">
+                <span class="price-cell-label">Крафт</span>
+                <span class="price-cell-value cost">${fmt(unitCost)} 🪙</span>
+            </div>` : ''}
+            ${birzhaPrice > 0 ? `<div class="price-cell">
+                <span class="price-cell-label">Биржа</span>
+                <span class="price-cell-value cost">${fmt(birzhaPrice)} 🪙</span>
+            </div>` : ''}
+            ${diff !== null ? `<div class="price-cell">
+                <span class="price-cell-label">${diffLabel}</span>
+                <span class="price-cell-value" style="color:${diffColor}">${diffSign}${fmt(diff)} 🪙</span>
+            </div>` : ''}
+        </div>`;
+    }
+
+    const effectiveCost = unitCost > 0 ? unitCost : item.cost;
+    const lineTotal = qty > 0
+        ? `<span class="total-sum">×${qty} = <span>${fmt(effectiveCost * qty)} 🪙</span></span>`
+        : '<span style="font-size:11px;color:var(--text-muted)">Кол-во</span>';
+
+    return `<div class="craft-card${expanded}${favClass}" data-name="${item.name.replace(/"/g,'&quot;')}">
+        <div class="craft-icon">${icon}</div>
+        <div class="craft-info">
+            <div class="craft-header-row">
+                <span class="craft-name">${item.name}</span>
+                <span class="expand-chevron">▼</span>
+                ${pricesHTML}
+            </div>
+            <div class="craft-res-row">${qtyBadge}${timeBadge}${discBadge}</div>
+            <div class="res-grid" style="margin-top:6px">${resItems || '<span style="color:var(--text-muted);font-size:11px">— нет данных —</span>'}</div>
+        </div>
+        <div class="craft-footer" onclick="event.stopPropagation()">
+            <button class="fav-btn" title="Избранное" onclick="toggleFav('${item.name.replace(/'/g,"\\'")}',event)">${isFav ? '★' : '☆'}</button>
+            <div class="quantity-control">
+                <button onclick="changeQty('${item.name.replace(/'/g,"\\'")}', -1, event)">−</button>
+                <input type="number" min="0" value="${qty}" onchange="setQty('${item.name.replace(/'/g,"\\'")}', this.value, event)" onclick="event.stopPropagation()">
+                <button onclick="changeQty('${item.name.replace(/'/g,"\\'")}', 1, event)">+</button>
+            </div>
+            ${lineTotal}
+        </div>
+        <div class="craft-expand">
+            ${isExp ? buildExpandHTML(item, Math.max(qty,1)) : ''}
+        </div>
+    </div>`;
+}
+
+function render() {
+    const items = filtered();
+    document.getElementById('item-count').textContent = items.length;
+
+    const savEl = document.getElementById('total-saving');
+    if (discount > 0) {
+        const saving = items.filter(i => i.hasDiscount)
+            .reduce((s, i) => {
+                const cNoDisc = getUnitCost(i, 0);
+                const cDisc   = getUnitCost(i, discount);
+                return s + (cNoDisc - cDisc);
+            }, 0);
+        if (saving > 0) {
+            savEl.style.display = 'block';
+            document.getElementById('saving-val').textContent = `−${fmt(saving)} 🪙`;
+        } else savEl.style.display = 'none';
+    } else savEl.style.display = 'none';
+
+    const hasFavs  = items.some(i => favorites[i.name]);
+    const isSorted  = sortOrder !== null || sortOrderRoi !== null;
+    const flatMode  = hasFavs || isSorted;
+
+    if (flatMode) {
+        document.getElementById('craft-container').innerHTML =
+            `<div style="display:flex;flex-direction:column;gap:8px">${items.map(renderCard).join('')}</div>`;
+    } else {
+        const byCat = {};
+        CATS_ORDER.forEach(c => byCat[c] = items.filter(i => i.cat === c));
+        document.getElementById('craft-container').innerHTML = CATS_ORDER.map(cat => {
+            const catItems = byCat[cat];
+            if (!catItems.length) return '';
+            return `<div class="type-section">
+                <div class="type-header">${CAT_ICONS[cat]} ${cat}</div>
+                <div style="display:flex;flex-direction:column;gap:8px">
+                    ${catItems.map(renderCard).join('')}
+                </div>
+            </div>`;
+        }).join('');
+    }
+
+    document.querySelectorAll('.craft-card').forEach(card => {
+      card.addEventListener('click', (e) => {
+    if (e.target.closest('button, input, .quantity-control, .fav-btn, .craft-footer, .craft-expand')) return;
+    toggleExpand(card.dataset.name);
+});
+    });
+    updateCalcTotal();
+}
+
+// ===== EXPAND =====
+function toggleExpand(name) {
+    if (expandedCards.has(name)) {
+        expandedCards.delete(name);
+    } else {
+        expandedCards.add(name);
+    }
+    const item = ALL_ITEMS.find(i => i.name === name);
+    if (!item) return;
+    const card = document.querySelector(`.craft-card[data-name="${name.replace(/"/g,'&quot;')}"]`);
+    if (!card) return;
+    const expandDiv = card.querySelector('.craft-expand');
+    if (expandedCards.has(name)) {
+        card.classList.add('expanded');
+        expandDiv.innerHTML = buildExpandHTML(item, Math.max(quantities[name] || 1, 1));
+    } else {
+        card.classList.remove('expanded');
+    }
+}
+
+// ===== ИЗБРАННОЕ =====
+function toggleFav(name, e) {
+    e && e.stopPropagation();
+    favorites[name] = !favorites[name];
+    render();
+    if (favorites[name]) {
+        const card = document.querySelector(`.craft-card[data-name="${name.replace(/"/g,'&quot;')}"]`);
+        if (card) {
+            card.classList.add('lifted');
+            card.addEventListener('animationend', () => card.classList.remove('lifted'), { once: true });
+        }
+    }
+}
+
+// ===== КОЛИЧЕСТВО =====
+function changeQty(name, delta, e) {
+    e && e.stopPropagation();
+    quantities[name] = Math.max(0, (quantities[name] || 0) + delta);
+    refreshCardFooter(name);
+    updateCalcTotal();
+}
+
+function setQty(name, val, e) {
+    e && e.stopPropagation();
+    quantities[name] = Math.max(0, parseInt(val) || 0);
+    refreshCardFooter(name);
+    updateCalcTotal();
+}
+
+function refreshCardFooter(name) {
+    const card = document.querySelector(`.craft-card[data-name="${name.replace(/"/g,'&quot;')}"]`);
+    if (!card) return;
+    const item = ALL_ITEMS.find(i => i.name === name);
+    if (!item) return;
+    const qty = quantities[name] || 0;
+    const effectiveCost = getUnitCost(item, discount) || item.cost || 0;
+
+    const footer = card.querySelector('.craft-footer');
+    if (!footer) return;
+    const totalEl = footer.querySelector('.total-sum, span[style]');
+    if (totalEl) {
+        if (qty > 0) {
+            totalEl.outerHTML = `<span class="total-sum">×${qty} = <span>${fmt(effectiveCost * qty)} 🪙</span></span>`;
+        } else {
+            totalEl.outerHTML = '<span style="font-size:11px;color:var(--text-muted)">Кол-во</span>';
+        }
+    }
+
+    const input = footer.querySelector('input[type="number"]');
+    if (input) input.value = qty;
+
+    // Обновим expand если открыт
+    if (expandedCards.has(name)) {
+        const expandDiv = card.querySelector('.craft-expand');
+        if (expandDiv) expandDiv.innerHTML = buildExpandHTML(item, Math.max(qty, 1));
+    }
+}
+
+// ===== СКИДКА =====
+function setDiscount(val) {
+    discount = val;
+    document.getElementById('discount-display').textContent = val + '%';
+    document.getElementById('discount-display').className = 'discount-value' + (val >= 35 ? ' max' : '');
+    document.getElementById('discount-slider').value = val;
+    document.querySelectorAll('.preset-btn').forEach(b => {
+        b.classList.toggle('active', +b.dataset.val === val);
+    });
+    render();
+}
+
+// ===== ДАННЫЕ =====
+function dbRowToItem(row, catName) {
+    const res = {};
+    DB_RES_COLS.forEach(col => {
+        const v = Number(row[col]);
+        if (v > 0) res[col] = v;
+    });
+    return {
+        name:        row.name,
+        cat:         catName,
+        res,
+        cost:        Number(row.cost)        || 0,
+        time:        Number(row.time)        || 0,
+        quantity:    Number(row.quantity)    || 1,
+        hasDiscount: Boolean(row.has_discount),
+    };
+}
+
+async function loadData() {
+    const loader = document.getElementById('loader');
+    const container = document.getElementById('craft-container');
+    const srcEl = document.getElementById('src-indicator');
+
+    try {
+        // db — клиент из config.js
+        const sb = (typeof db !== 'undefined' && db)
+            ? db
+            : (window.SUPABASE_CLIENT || (window.SUPABASE_URL && window.SUPABASE_KEY
+                ? supabase.createClient(window.SUPABASE_URL, window.SUPABASE_KEY)
+                : null));
+
+        if (!sb) throw new Error('No Supabase client');
+
+        // Загружаем категории и ресурсы параллельно
+        const [catRes, resRes] = await Promise.all([
+            sb.from('craft_categories').select('id, name').order('sort_order'),
+            sb.from('resources').select('*'),
+        ]);
+
+        if (catRes.error) throw catRes.error;
+        if (resRes.error) throw resRes.error;
+
+        ALL_RESOURCES = resRes.data || [];
+
+        // Загружаем все рецепты по всем категориям
+        const allItems = [];
+        for (const cat of catRes.data) {
+            const { data, error } = await sb
+                .from('craft_items')
+                .select('*')
+                .eq('category_id', cat.id)
+                .order('name');
+            if (error) throw error;
+            (data || []).forEach(row => allItems.push(dbRowToItem(row, cat.name)));
+        }
+
+        ALL_ITEMS = allItems;
+        srcEl.innerHTML = '<span class="data-source live">● Live</span>';
+    } catch (err) {
+        console.warn('Supabase недоступен, используем локальные данные:', err.message);
+        srcEl.innerHTML = '<span class="data-source local">● Local</span>';
+
+        // Локальные данные (fallback)
+        ALL_RESOURCES = [
+            { name: 'Дерево',        is_base: true,  cost_avg: 12,   cost_calc: 12 },
+            { name: 'Железо',        is_base: false, cost_avg: 0,    cost_calc: 95 },
+            { name: 'Медь',          is_base: false, cost_avg: 0,    cost_calc: 130 },
+            { name: 'Бронза',        is_base: false, cost_avg: 0,    cost_calc: 320 },
+            { name: 'Уголь',         is_base: true,  cost_avg: 18,   cost_calc: 18 },
+            { name: 'Смола',         is_base: true,  cost_avg: 55,   cost_calc: 55 },
+            { name: 'Ткань',         is_base: true,  cost_avg: 30,   cost_calc: 30 },
+            { name: 'Парусина',      is_base: false, cost_avg: 0,    cost_calc: 480 },
+            { name: 'Пластина',      is_base: false, cost_avg: 0,    cost_calc: 550 },
+            { name: 'Железная руда', is_base: true,  cost_avg: 8,    cost_calc: 8 },
+            { name: 'Медная руда',   is_base: true,  cost_avg: 10,   cost_calc: 10 },
+            { name: 'Обломки',       is_base: true,  cost_avg: 5,    cost_calc: 5 },
+            { name: 'Животные',      is_base: true,  cost_avg: 40,   cost_calc: 40 },
+            { name: 'Золото',        is_base: true,  cost_avg: 100,  cost_calc: 100 },
+            { name: 'Боевая марка',  is_base: true,  cost_avg: 200,  cost_calc: 200 },
+            { name: 'Ром',           is_base: false, cost_avg: 0,    cost_calc: 250 },
+            { name: 'Припасы',       is_base: false, cost_avg: 0,    cost_calc: 180 },
+            { name: 'Рыба',          is_base: true,  cost_avg: 15,   cost_calc: 15 },
+            { name: 'Свежее мясо',   is_base: false, cost_avg: 0,    cost_calc: 120 },
+            { name: 'Китовый жир',   is_base: true,  cost_avg: 80,   cost_calc: 80 },
+        ];
+
+        ALL_ITEMS = [
+            { name: 'Балка',    cat: 'Мастерские',  res: { wood: 100 },                cost: 0,    time: 5,  quantity: 1, hasDiscount: true },
+            { name: 'Железо',   cat: 'Переработка', res: { iron_ore: 10 },             cost: 0,    time: 3,  quantity: 1, hasDiscount: false },
+            { name: 'Медь',     cat: 'Переработка', res: { copper_ore: 10 },           cost: 0,    time: 3,  quantity: 1, hasDiscount: false },
+            { name: 'Бронза',   cat: 'Переработка', res: { iron: 2, copper: 1 },       cost: 0,    time: 5,  quantity: 1, hasDiscount: false },
+            { name: 'Парусина', cat: 'Мастерские',  res: { cloth: 15 },                cost: 0,    time: 8,  quantity: 1, hasDiscount: true },
+            { name: 'Пластина', cat: 'Мастерские',  res: { iron: 5, coal: 3 },         cost: 0,    time: 10, quantity: 1, hasDiscount: true },
+            { name: 'Ром-паёк', cat: 'Расходные предметы', res: { rum: 2, animals: 1 }, cost: 1200, time: 2,  quantity: 5, hasDiscount: true },
+            { name: 'Чугунные ядра', cat: 'Расходные предметы', res: { iron: 3, coal: 2 }, cost: 800, time: 4, quantity: 10, hasDiscount: false },
+        ];
+    }
+
+    loader.style.display = 'none';
+    container.style.display = 'block';
+
+    // Кнопки категорий
+    const catFilters = document.getElementById('cat-filters');
+    const cats = [...new Set(ALL_ITEMS.map(i => i.cat))];
+    catFilters.innerHTML = `<button class="sort-btn active" data-cat="">Все</button>` +
+        cats.map(c => `<button class="sort-btn" data-cat="${c}">${CAT_ICONS[c] || ''} ${c}</button>`).join('');
+
+    catFilters.addEventListener('click', e => {
+        const btn = e.target.closest('[data-cat]');
+        if (!btn) return;
+        activeCategory = btn.dataset.cat;
+        catFilters.querySelectorAll('.sort-btn').forEach(b => b.classList.toggle('active', b === btn));
+        render();
+    });
+
+    render();
+}
+
+// ===== ИНИЦИАЛИЗАЦИЯ =====
+document.addEventListener('DOMContentLoaded', () => {
+    // Поиск
+    document.getElementById('search-input').addEventListener('input', e => {
+        searchQuery = e.target.value.toLowerCase().trim();
+        render();
+    });
+
+    // ROI фильтры
+    document.getElementById('roi-all').addEventListener('click', () => {
+        roiFilter = 'all';
+        document.querySelectorAll('#roi-filters .sort-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById('roi-all').classList.add('active');
+        render();
+    });
+    document.getElementById('roi-profit').addEventListener('click', () => {
+        roiFilter = 'profit';
+        document.querySelectorAll('#roi-filters .sort-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById('roi-profit').classList.add('active');
+        render();
+    });
+    document.getElementById('roi-loss').addEventListener('click', () => {
+        roiFilter = 'loss';
+        document.querySelectorAll('#roi-filters .sort-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById('roi-loss').classList.add('active');
+        render();
+    });
+
+    // Сортировка цена
+    document.getElementById('sort-asc').addEventListener('click', () => {
+        sortOrder = sortOrder === 'asc' ? null : 'asc';
+        sortOrderRoi = null;
+        document.getElementById('sort-asc').classList.toggle('active', sortOrder === 'asc');
+        document.getElementById('sort-desc').classList.remove('active');
+        document.getElementById('sort-roi-asc').classList.remove('active');
+        document.getElementById('sort-roi-desc').classList.remove('active');
+        render();
+    });
+    document.getElementById('sort-desc').addEventListener('click', () => {
+        sortOrder = sortOrder === 'desc' ? null : 'desc';
+        sortOrderRoi = null;
+        document.getElementById('sort-desc').classList.toggle('active', sortOrder === 'desc');
+        document.getElementById('sort-asc').classList.remove('active');
+        document.getElementById('sort-roi-asc').classList.remove('active');
+        document.getElementById('sort-roi-desc').classList.remove('active');
+        render();
+    });
+
+    // Сортировка ROI
+    document.getElementById('sort-roi-desc').addEventListener('click', () => {
+        sortOrderRoi = sortOrderRoi === 'roi-desc' ? null : 'roi-desc';
+        sortOrder = null;
+        document.getElementById('sort-roi-desc').classList.toggle('active', sortOrderRoi === 'roi-desc');
+        document.getElementById('sort-roi-asc').classList.remove('active');
+        document.getElementById('sort-asc').classList.remove('active');
+        document.getElementById('sort-desc').classList.remove('active');
+        render();
+    });
+    document.getElementById('sort-roi-asc').addEventListener('click', () => {
+        sortOrderRoi = sortOrderRoi === 'roi-asc' ? null : 'roi-asc';
+        sortOrder = null;
+        document.getElementById('sort-roi-asc').classList.toggle('active', sortOrderRoi === 'roi-asc');
+        document.getElementById('sort-roi-desc').classList.remove('active');
+        document.getElementById('sort-asc').classList.remove('active');
+        document.getElementById('sort-desc').classList.remove('active');
+        render();
+    });
+
+    // Сброс
+    document.getElementById('btn-reset').addEventListener('click', () => {
+        activeCategory = null;
+        searchQuery = '';
+        sortOrder = null;
+        sortOrderRoi = null;
+        roiFilter = 'all';
+        document.getElementById('search-input').value = '';
+        document.querySelectorAll('#cat-filters .sort-btn').forEach((b,i) => b.classList.toggle('active', i === 0));
+        document.querySelectorAll('#roi-filters .sort-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById('roi-all').classList.add('active');
+        document.getElementById('sort-asc').classList.remove('active');
+        document.getElementById('sort-desc').classList.remove('active');
+        document.getElementById('sort-roi-asc').classList.remove('active');
+        document.getElementById('sort-roi-desc').classList.remove('active');
+        render();
+    });
+
+    // Скидка — слайдер
+    document.getElementById('discount-slider').addEventListener('input', e => {
+        setDiscount(+e.target.value);
+    });
+
+    // Скидка — пресеты
+    document.querySelectorAll('.preset-btn').forEach(btn => {
+        btn.addEventListener('click', () => setDiscount(+btn.dataset.val));
+    });
+
+    // Калькулятор — очистить
+    document.getElementById('calc-clear').addEventListener('click', () => {
+        quantities = {};
+        render();
+    });
+
+    loadData();
+});
+</script>
+</body>
+</html>
