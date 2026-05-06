@@ -711,85 +711,147 @@ function buildExpandHTML(item, qty) {
     const craftEntries = Object.entries(item.res || {}).filter(([,v]) => v > 0);
 
     if (!craftEntries.length) {
-        return `<div class="craft-expand-inner"><span style="color:var(--text-muted);font-size:12px">Нет данных о ресурсах</span></div>`;
+        return `<div class="craft-expand-inner">
+            <div class="expand-section">
+                <div class="expand-section-title">📦 Ингредиенты</div>
+                <div style="font-size:12px;color:var(--text-muted)">Нет данных о ресурсах</div>
+            </div>
+        </div>`;
     }
 
     const effectiveDisc = item.hasDiscount ? discount : 0;
-    const totalCrafts   = Math.ceil(effectiveQty / itemQty);
 
-    const resRows = craftEntries.map(([col, baseAmt]) => {
-        const effectiveAmt = effectiveDisc > 0 ? Math.floor(baseAmt * (1 - effectiveDisc / 100)) : baseAmt;
-        const totalAmt     = effectiveAmt * totalCrafts;
+    // Считаем строки на 1 крафт с учётом скидки
+    let totalCostOneCraft = 0;
+    const rows = craftEntries.map(([col, amount]) => {
+        const effectiveAmt = effectiveDisc > 0 ? Math.floor(amount * (1 - effectiveDisc / 100)) : amount;
         const unitPrice    = getUnitPrice(col);
-        const totalCost    = totalAmt * unitPrice;
-        const share        = totalCost / calcCraftCost(item, discount) * 100;
-        const meta = RES_LABELS_CRAFT[col] || { label: col, emoji: '📦' };
-
-        return { col, meta, effectiveAmt, totalAmt, unitPrice, totalCost, share };
+        const totalPrice   = effectiveAmt * unitPrice;
+        totalCostOneCraft += totalPrice;
+        return { col, amtOneCraft: effectiveAmt, unitPrice, totalPriceOneCraft: totalPrice };
     });
+    rows.forEach(r => r.share = totalCostOneCraft > 0 ? r.totalPriceOneCraft / totalCostOneCraft * 100 : 0);
 
-    const totalCostBatch = calcCraftCost(item, discount);
-    const totalCostAll   = totalCostBatch * totalCrafts;
-    const birzhaPrice    = item.cost || 0;
-    const unitCost       = getUnitCost(item, discount);
-    const diff           = (birzhaPrice > 0 && unitCost > 0) ? birzhaPrice - unitCost : null;
-    const roiVal         = diff !== null ? (diff / unitCost * 100) : null;
+    // Цена за 1 единицу товара
+    const costPerUnit = totalCostOneCraft / itemQty;
 
-    const resTableRows = resRows.map(r => `
-        <tr>
-            <td>${r.meta.emoji} ${r.meta.label}</td>
-            <td class="num">${r.effectiveAmt.toLocaleString('ru-RU')}</td>
-            <td class="num">${r.totalAmt.toLocaleString('ru-RU')}</td>
-            <td class="num">${r.unitPrice > 0 ? fmt(r.unitPrice) + ' 🪙' : '—'}</td>
-            <td class="num">${r.unitPrice > 0 ? fmt(r.totalCost) + ' 🪙' : '—'}</td>
-            <td>
+    // Итого с учётом выбранного количества
+    const totalCostTotal = costPerUnit * effectiveQty;
+
+    const qtyInfo = itemQty > 1 ? ` | 📦 ${itemQty} шт/крафт` : '';
+
+    // Финансовые показатели
+    const birzhaPrice = item.cost || 0;
+    const birzhaTotal = birzhaPrice * effectiveQty;
+    const diff        = (birzhaPrice > 0 && costPerUnit > 0) ? birzhaPrice - costPerUnit : null;
+    const diffLabel   = diff !== null ? (diff >= 0 ? '💰 Доход' : '📉 Убыток') : '';
+    const diffTotal   = diff !== null ? diff * effectiveQty : null;
+
+    const margin      = (diff !== null && birzhaPrice > 0) ? diff / birzhaPrice * 100 : null;
+    const roi         = (diff !== null && costPerUnit > 0)  ? diff / costPerUnit * 100 : null;
+
+    const diffClass   = diff === null ? '' : (diff >= 0 ? 'saving' : 'loss');
+    const diffSign    = diff !== null ? (diff >= 0 ? '+' : '') : '';
+
+    // Если qty > 1 — показываем только итоговые строки (×N шт.), без дублей "за 1 шт."
+    const showSingle  = effectiveQty === 1;
+    const showMulti   = effectiveQty > 1;
+
+    const discountNote = item.hasDiscount && discount > 0 ? ` (скидка ${discount}%)` : '';
+
+    const finHTML = `<div class="expand-section">
+        <div class="expand-section-title">💹 Финансовые показатели${showMulti ? ' (×' + effectiveQty + ' шт.)' : ''}</div>
+        <div class="fin-grid">
+            ${costPerUnit > 0 && showSingle ? `<div class="fin-row">
+                <span class="fin-label">🔨 Крафт${discountNote}</span>
+                <span class="fin-value">${fmt(costPerUnit)} 🪙</span>
+            </div>` : ''}
+            ${costPerUnit > 0 && showMulti ? `<div class="fin-row">
+                <span class="fin-label">🔨 Крафт ×${effectiveQty} шт.${discountNote}</span>
+                <span class="fin-value">${fmt(totalCostTotal)} 🪙</span>
+            </div>` : ''}
+            ${birzhaPrice > 0 && showSingle ? `<div class="fin-row">
+                <span class="fin-label">📈 Биржа</span>
+                <span class="fin-value">${fmt(birzhaPrice)} 🪙</span>
+            </div>` : ''}
+            ${birzhaPrice > 0 && showMulti ? `<div class="fin-row">
+                <span class="fin-label">📈 Биржа ×${effectiveQty} шт.</span>
+                <span class="fin-value">${fmt(birzhaTotal)} 🪙</span>
+            </div>` : ''}
+            ${diff !== null && showSingle ? `<div class="fin-row">
+                <span class="fin-label">${diffLabel}</span>
+                <span class="fin-value ${diffClass}">${diffSign}${fmt(diff)} 🪙</span>
+            </div>` : ''}
+            ${diffTotal !== null && showMulti ? `<div class="fin-row">
+                <span class="fin-label">${diffLabel} ×${effectiveQty} шт.</span>
+                <span class="fin-value ${diffClass}">${diffSign}${fmt(diffTotal)} 🪙</span>
+            </div>` : ''}
+            ${margin !== null ? `<div class="fin-row">
+                <span class="fin-label">📊 Маржа</span>
+                <span class="fin-value ${diffClass}">${margin.toFixed(1)}%</span>
+            </div>` : ''}
+            ${roi !== null ? `<div class="fin-row">
+                <span class="fin-label">💹 ROI</span>
+                <span class="fin-value ${diffClass}">${roi.toFixed(1)}%${roi > 0 ? ` <span style="font-size:10px;opacity:0.7;font-weight:400">в ${(1 + roi / 100).toFixed(1)}×</span>` : ''}</span>
+            </div>` : ''}
+        </div>
+    </div>`;
+
+    // Строки таблицы: количество ресурса для effectiveQty единиц товара
+    const tableRows = rows.map(r => {
+        const meta         = RES_LABELS_CRAFT[r.col] || { label: r.col, emoji: '📦' };
+        const amtPerUnit   = r.amtOneCraft / itemQty;
+        const amtTotal     = amtPerUnit * effectiveQty;
+        const barW         = Math.max(1, Math.round(r.share));
+        const unitStr      = r.unitPrice > 0 ? r.unitPrice.toLocaleString('ru-RU', {maximumFractionDigits:2}) + ' 🪙' : '—';
+        const totalResPrice = (r.totalPriceOneCraft / itemQty) * effectiveQty;
+        const totalStr      = totalResPrice > 0 ? Math.round(totalResPrice).toLocaleString('ru-RU') + ' 🪙' : '—';
+        const amtStr = amtTotal > 0
+            ? (Number.isInteger(amtTotal) ? amtTotal.toLocaleString('ru-RU') : amtTotal.toLocaleString('ru-RU', { maximumFractionDigits: 4 }))
+            : '—';
+        return `<tr>
+            <td>${meta.emoji} ${meta.label}</td>
+            <td class="num">${amtStr}</td>
+            <td class="num">${unitStr}</td>
+            <td class="num">${totalStr}</td>
+            <td class="num">
                 <div class="share-bar-wrap">
-                    <div class="share-bar-track"><div class="share-bar" style="width:${Math.min(r.share,100).toFixed(0)}%"></div></div>
-                    <span class="share-pct">${r.share.toFixed(0)}%</span>
+                    <div class="share-bar-track"><div class="share-bar" style="width:${barW}%"></div></div>
+                    <span class="share-pct">${Math.round(r.share)}%</span>
                 </div>
             </td>
-        </tr>`).join('');
+        </tr>`;
+    }).join('');
 
-    const finHTML = `
-        <div class="fin-grid">
-            ${unitCost > 0 ? `<div class="fin-row"><span class="fin-label">Себестоимость (1 шт)</span><span class="fin-value">${fmt(unitCost)} 🪙</span></div>` : ''}
-            ${unitCost > 0 && totalCrafts > 1 ? `<div class="fin-row"><span class="fin-label">Себестоимость (${effectiveQty} шт)</span><span class="fin-value">${fmt(unitCost * effectiveQty)} 🪙</span></div>` : ''}
-            ${birzhaPrice > 0 ? `<div class="fin-row"><span class="fin-label">Цена на бирже (1 шт)</span><span class="fin-value">${fmt(birzhaPrice)} 🪙</span></div>` : ''}
-            ${diff !== null ? `<div class="fin-row"><span class="fin-label">${diff >= 0 ? 'Доход' : 'Убыток'} (1 шт)</span><span class="fin-value ${diff >= 0 ? 'saving' : 'loss'}">${diff >= 0 ? '+' : ''}${fmt(diff)} 🪙</span></div>` : ''}
-            ${roiVal !== null ? `<div class="fin-row"><span class="fin-label">ROI</span><span class="fin-value ${roiVal >= 0 ? 'saving' : 'loss'}">${roiVal >= 0 ? '+' : ''}${roiVal.toFixed(1)}%</span></div>` : ''}
-            ${item.hasDiscount && effectiveDisc > 0 ? `<div class="fin-row"><span class="fin-label">Скидка на крафт</span><span class="fin-value saving">−${effectiveDisc}%</span></div>` : ''}
-        </div>`;
+    const totalStr    = totalCostTotal > 0 ? Math.round(totalCostTotal).toLocaleString('ru-RU') + ' 🪙' : '—';
+    const titleSuffix = totalCostTotal > 0 ? ` (${totalStr})` : '';
 
     return `<div class="craft-expand-inner">
         <div class="expand-section">
-            <div class="expand-section-title">📦 Ресурсы <span style="color:var(--text-muted);font-weight:400">(${totalCrafts} крафт${totalCrafts > 1 ? 'а' : ''})</span></div>
+            <div class="expand-section-title">📊 Структура себестоимости${titleSuffix}${effectiveQty > 1 ? ' ×' + effectiveQty + ' шт.' : ''}${qtyInfo}</div>
             <div class="expand-table-wrap">
                 <table class="expand-table">
                     <thead>
                         <tr>
                             <th>Ресурс</th>
-                            <th>За крафт</th>
-                            <th>Всего</th>
-                            <th>Цена</th>
-                            <th>Стоимость</th>
+                            <th>Кол-во</th>
+                            <th>Цена / ед.</th>
+                            <th>Итого</th>
                             <th>Доля</th>
                         </tr>
                     </thead>
-                    <tbody>${resTableRows}</tbody>
+                    <tbody>${tableRows}</tbody>
                     <tfoot>
                         <tr>
-                            <td colspan="4">Итого</td>
-                            <td class="num">${fmt(totalCostAll)} 🪙</td>
+                            <td colspan="3">Итого</td>
+                            <td class="num">${totalStr}</td>
                             <td></td>
                         </tr>
                     </tfoot>
                 </table>
             </div>
         </div>
-        <div class="expand-section">
-            <div class="expand-section-title">💰 Финансы</div>
-            ${finHTML}
-        </div>
+        ${finHTML}
     </div>`;
 }
 
