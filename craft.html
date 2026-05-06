@@ -1097,7 +1097,7 @@ async function loadData() {
 
         // Загружаем категории и ресурсы параллельно
         const [catRes, resRes] = await Promise.all([
-            sb.from('craft_categories').select('id, name').order('sort_order'),
+            sb.from('craft_categories').select('id, name'),
             sb.from('resources').select('*'),
         ]);
 
