@@ -1135,10 +1135,10 @@ function dbRowToItem(row, catName) {
         name:        row.name,
         cat:         catName,
         res,
-        cost:        Number(row.cost)        || 0,
-        time:        Number(row.time)        || 0,
+        cost:        Number(row.craft_cost)  || 0,
+        time:        Number(row.craft_time)  || 0,
         quantity:    Number(row.quantity)    || 1,
-        hasDiscount: Boolean(row.has_discount),
+        hasDiscount: Number(row.discount)    > 0,
     };
 }
 
