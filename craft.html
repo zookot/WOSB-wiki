@@ -1173,7 +1173,7 @@ async function loadData() {
         const btn = e.target.closest('[data-cat]');
         if (!btn) return;
         activeCategory = btn.dataset.cat;
-        catFilters.querySelectorAll('.btn').forEach(b => b.classList.toggle('active', b === btn));
+        catFilters.querySelectorAll('.sort-btn').forEach(b => b.classList.toggle('active', b === btn));
         render();
     });
 
