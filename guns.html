@@ -532,6 +532,57 @@
             }
         }
 
+        /* ===== SKELETON LOADER ===== */
+        .skeleton-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 0;
+            display: grid;
+            grid-template-columns: 60px 1fr;
+            overflow: hidden;
+            height: 60px;
+        }
+
+        .skeleton-icon {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(90deg, var(--bg-dark) 25%, rgba(255,255,255,0.05) 50%, var(--bg-dark) 75%);
+            background-size: 200% 100%;
+            animation: skeleton-shimmer 1.5s ease-in-out infinite;
+            border-right: 1px solid var(--border);
+        }
+
+        .skeleton-info {
+            padding: 10px 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .skeleton-line {
+            height: 10px;
+            border-radius: 4px;
+            background: linear-gradient(90deg, var(--bg-dark) 25%, rgba(255,255,255,0.05) 50%, var(--bg-dark) 75%);
+            background-size: 200% 100%;
+            animation: skeleton-shimmer 1.5s ease-in-out infinite;
+        }
+
+        .skeleton-line.short { width: 40%; }
+        .skeleton-line.medium { width: 60%; }
+        .skeleton-line.long { width: 80%; }
+
+        .skeleton-section {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        @keyframes skeleton-shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+
         .quantity-control {
             display: flex;
             align-items: center;
@@ -1235,17 +1286,37 @@
         }
 
         // ===== ИНИЦИАЛИЗАЦИЯ =====
+        // ===== SKELETON LOADER =====
+        function getSkeletonHTML() {
+            const skeletons = [];
+            for (let i = 0; i < 10; i++) {
+                skeletons.push(`<div class="skeleton-card">
+                    <div class="skeleton-icon"></div>
+                    <div class="skeleton-info">
+                        <div class="skeleton-line short"></div>
+                        <div class="skeleton-line medium"></div>
+                        <div class="skeleton-line long"></div>
+                    </div>
+                </div>`);
+            }
+            return `<div class="skeleton-section">${skeletons.join('')}</div>`;
+        }
+
         async function init() {
             const loader = document.getElementById('loader');
             const cont = document.getElementById('guns-container');
             const srcEl = document.getElementById('src-indicator');
+
+            cont.style.display = 'block';
+            cont.innerHTML = getSkeletonHTML();
 
             const fallbackTimeout = setTimeout(() => {
                 console.warn('Supabase таймаут, используем локальные данные');
                 ALL_GUNS = localGuns();
                 srcEl.innerHTML = '<span class="data-source local">🟡 Локальные данные</span>';
                 loader.style.display = 'none';
-                cont.style.display = 'block';
+                render();
+                attachCardEvents();
                 finishInit();
             }, 8000);
 
@@ -1267,7 +1338,8 @@
             }
 
             loader.style.display = 'none';
-            cont.style.display = 'block';
+            render();
+            attachCardEvents();
             finishInit();
         }
 

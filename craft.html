@@ -486,6 +486,57 @@
 
         .craft-card.lifted { animation: liftCard 0.5s ease-out; }
         @keyframes liftCard { 0% { transform: translateY(10px); opacity: 0.5; } 100% { transform: translateY(0); opacity: 1; } }
+
+        /* ===== SKELETON LOADER ===== */
+        .skeleton-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 0;
+            display: grid;
+            grid-template-columns: 56px 1fr;
+            overflow: hidden;
+            height: 56px;
+        }
+
+        .skeleton-icon {
+            width: 56px;
+            height: 56px;
+            background: linear-gradient(90deg, var(--bg-dark) 25%, rgba(255,255,255,0.05) 50%, var(--bg-dark) 75%);
+            background-size: 200% 100%;
+            animation: skeleton-shimmer 1.5s ease-in-out infinite;
+            border-right: 1px solid var(--border);
+        }
+
+        .skeleton-info {
+            padding: 9px 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .skeleton-line {
+            height: 10px;
+            border-radius: 4px;
+            background: linear-gradient(90deg, var(--bg-dark) 25%, rgba(255,255,255,0.05) 50%, var(--bg-dark) 75%);
+            background-size: 200% 100%;
+            animation: skeleton-shimmer 1.5s ease-in-out infinite;
+        }
+
+        .skeleton-line.short { width: 40%; }
+        .skeleton-line.medium { width: 60%; }
+        .skeleton-line.long { width: 80%; }
+
+        .skeleton-section {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        @keyframes skeleton-shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
     </style>
 </head>
 
@@ -1143,16 +1194,20 @@ function dbRowToItem(row, catName) {
 }
 
 async function loadFromSupabase() {
-    const { data: cats,  error: catErr  } = await db.from('craft_categories').select('id,name');
-    if (catErr) throw catErr;
-    const { data: items, error: itemErr } = await db.from('craft_items').select('*').order('id');
-    if (itemErr) throw itemErr;
-    const { data: res,   error: resErr  } = await db.from('resources').select('*');
-    if (resErr) throw resErr;
-    ALL_RESOURCES = res || [];
+    const [catsResult, itemsResult, resResult] = await Promise.all([
+        db.from('craft_categories').select('id,name'),
+        db.from('craft_items').select('*').order('id'),
+        db.from('resources').select('*'),
+    ]);
+
+    if (catsResult.error) throw catsResult.error;
+    if (itemsResult.error) throw itemsResult.error;
+    if (resResult.error) throw resResult.error;
+
+    ALL_RESOURCES = resResult.data || [];
     const catMap = {};
-    cats.forEach(c => { catMap[c.id] = c.name; });
-    return items.map(row => dbRowToItem(row, catMap[row.category_id] || 'Разное'));
+    catsResult.data.forEach(c => { catMap[c.id] = c.name; });
+    return itemsResult.data.map(row => dbRowToItem(row, catMap[row.category_id] || 'Разное'));
 }
 
 // ===== ЛОКАЛЬНЫЕ ДАННЫЕ (fallback) =====
@@ -1205,39 +1260,20 @@ const LOCAL_DATA = [
     { cat:'Расходные предметы',name:'Горн',cost:10000,market_price:0,hasDiscount:false,time:0,res:{voodoo_skull:1}},
 ];
 
-// ===== ИНИЦИАЛИЗАЦИЯ =====
-async function init() {
-    const loader = document.getElementById('loader');
-    const cont   = document.getElementById('craft-container');
-    const srcEl  = document.getElementById('src-indicator');
-
-    try {
-        ALL_ITEMS = await loadFromSupabase();
-        srcEl.innerHTML = '<span class="data-source live">🟢 Supabase</span>';
-    } catch(e) {
-        console.warn('Supabase недоступен, локальные данные:', e);
-        ALL_ITEMS = LOCAL_DATA;
-        srcEl.innerHTML = '<span class="data-source local">🟡 Локальные данные</span>';
+// ===== SKELETON LOADER =====
+function getSkeletonHTML() {
+    const skeletons = [];
+    for (let i = 0; i < 10; i++) {
+        skeletons.push(`<div class="skeleton-card">
+            <div class="skeleton-icon"></div>
+            <div class="skeleton-info">
+                <div class="skeleton-line short"></div>
+                <div class="skeleton-line medium"></div>
+                <div class="skeleton-line long"></div>
+            </div>
+        </div>`);
     }
-
-    loader.style.display = 'none';
-    cont.style.display   = 'block';
-
-    // Кнопки категорий
-    const catFilters = document.getElementById('cat-filters');
-    const cats = [...new Set(ALL_ITEMS.map(i => i.cat))];
-    catFilters.innerHTML = `<button class="sort-btn active" data-cat="">Все</button>` +
-        cats.map(c => `<button class="sort-btn" data-cat="${c}">${CAT_ICONS[c] || ''} ${c}</button>`).join('');
-
-    catFilters.addEventListener('click', e => {
-        const btn = e.target.closest('[data-cat]');
-        if (!btn) return;
-        activeCategory = btn.dataset.cat;
-        catFilters.querySelectorAll('.sort-btn').forEach(b => b.classList.toggle('active', b === btn));
-        render();
-    });
-
-    render();
+    return `<div class="skeleton-section">${skeletons.join('')}</div>`;
 }
 
 // ===== ИНИЦИАЛИЗАЦИЯ =====
@@ -1246,6 +1282,9 @@ async function init() {
     const cont   = document.getElementById('craft-container');
     const srcEl  = document.getElementById('src-indicator');
 
+    cont.style.display = 'block';
+    cont.innerHTML = getSkeletonHTML();
+
     try {
         ALL_ITEMS = await loadFromSupabase();
         srcEl.innerHTML = '<span class="data-source live">🟢 Supabase</span>';
@@ -1256,7 +1295,6 @@ async function init() {
     }
 
     loader.style.display = 'none';
-    cont.style.display   = 'block';
 
     const catCont = document.getElementById('cat-filters');
     CATS_ORDER.forEach(c => {
