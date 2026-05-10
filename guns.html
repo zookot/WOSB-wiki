@@ -651,11 +651,20 @@
                 </div>
             </div>
             <div class="filter-group">
+                <div class="filter-label">📊 Окупаемость</div>
+                <div class="sort-buttons" id="roi-filters">
+                    <button class="sort-btn active" id="roi-all" title="Все орудия">Все</button>
+                    <button class="sort-btn" id="roi-profit" title="Окупаемые (ROI > 0)">Окупаемые</button>
+                    <button class="sort-btn" id="roi-loss" title="Убыточные (ROI < 0)">Убыточные</button>
+                </div>
+            </div>
+            <div class="filter-group">
                 <div class="filter-label">↕ Сортировка</div>
                 <div class="sort-buttons">
                     <button class="sort-btn" id="sort-desc" title="Сначала дорогие">↓ Дорогие</button>
                     <button class="sort-btn" id="sort-asc" title="Сначала дешёвые">↑ Дешёвые</button>
-                    <button class="sort-btn" id="sort-roi" title="Сначала с высоким ROI">📈 ROI</button>
+                    <button class="sort-btn" id="sort-roi-desc" title="ROI по убыванию">↓ ROI</button>
+                    <button class="sort-btn" id="sort-roi-asc" title="ROI по возрастанию">↑ ROI</button>
                 </div>
             </div>
             <button class="btn-reset" id="btn-reset">↺ Сбросить</button>
@@ -711,6 +720,8 @@
         let priceMin = 0;
         let sortOrder = null;
         let calcMode = 'revenue';
+        let roiFilter = 'all';
+        let sortOrderRoi = null;
 
         let quantities = JSON.parse(localStorage.getItem('wosb_gun_quantities') || '{}');
         let favorites = JSON.parse(localStorage.getItem('wosb_gun_favorites') || '{}');
@@ -731,6 +742,15 @@
             const r = ALL_RESOURCES.find(x => x.name === resName);
             if (!r) return 0;
             return r.is_base ? Number(r.cost_avg) : Number(r.cost_calc);
+        }
+
+        function getROI(g) {
+            if ((g.res.pirate_token || 0) > 0 && Object.keys(g.res).filter(k => k !== 'pirate_token').length === 0) return null;
+            const cost = Object.entries(g.res || {})
+                .filter(([k]) => k !== 'pirate_token')
+                .reduce((s, [col, amt]) => s + getUnitPrice(col) * amt, 0);
+            if (!cost || !g.market_price) return null;
+            return (g.market_price - cost) / cost * 100;
         }
 
         // ===== БЛОК 3: СТРУКТУРА СЕБЕСТОИМОСТИ =====
@@ -924,26 +944,37 @@
 
         // ===== ФИЛЬТРЫ И СОРТИРОВКА =====
         function filtered() {
-            return ALL_GUNS.filter(g =>
+            let guns = ALL_GUNS.filter(g =>
                 (!activeType || g.type === activeType) &&
                 (!searchQuery || g.name.toLowerCase().includes(searchQuery)) &&
                 ((g.market_price || 0) >= priceMin)
             );
+
+            if (roiFilter !== 'all') {
+                guns = guns.filter(g => {
+                    const roi = getROI(g);
+                    if (roi === null) return false;
+                    return roiFilter === 'profit' ? roi > 0 : roi < 0;
+                });
+            }
+
+            return guns;
         }
 
         function sortedGuns(guns) {
             const sorted = [...guns];
             if (sortOrder === 'desc') sorted.sort((a, b) => (b.market_price || 0) - (a.market_price || 0));
             else if (sortOrder === 'asc') sorted.sort((a, b) => (a.market_price || 0) - (b.market_price || 0));
-            else if (sortOrder === 'roi') {
-                const getRoi = g => {
-                    const cost = Object.entries(g.res || {})
-                        .filter(([k]) => k !== 'pirate_token')
-                        .reduce((s, [col, amt]) => s + getUnitPrice(col) * amt, 0);
-                    if (!cost || !g.market_price) return -Infinity;
-                    return (g.market_price - cost) / cost * 100;
-                };
-                sorted.sort((a, b) => getRoi(b) - getRoi(a));
+
+            if (sortOrderRoi === 'roi-desc' || sortOrderRoi === 'roi-asc') {
+                sorted.sort((a, b) => {
+                    const roiA = getROI(a);
+                    const roiB = getROI(b);
+                    if (roiA === null && roiB === null) return 0;
+                    if (roiA === null) return 1;
+                    if (roiB === null) return -1;
+                    return sortOrderRoi === 'roi-desc' ? roiB - roiA : roiA - roiB;
+                });
             }
             return sorted;
         }
@@ -1265,28 +1296,70 @@
 
             document.getElementById('sort-desc').addEventListener('click', function () {
                 sortOrder = sortOrder === 'desc' ? null : 'desc';
-                document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
-                if (sortOrder) this.classList.add('active');
+                if (sortOrder === 'desc') sortOrderRoi = null;
+                this.classList.toggle('active', sortOrder === 'desc');
+                document.getElementById('sort-asc').classList.remove('active');
+                document.getElementById('sort-roi-desc').classList.remove('active');
+                document.getElementById('sort-roi-asc').classList.remove('active');
                 render();
                 attachCardEvents();
             });
 
             document.getElementById('sort-asc').addEventListener('click', function () {
                 sortOrder = sortOrder === 'asc' ? null : 'asc';
-                document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
-                if (sortOrder) this.classList.add('active');
+                if (sortOrder === 'asc') sortOrderRoi = null;
+                this.classList.toggle('active', sortOrder === 'asc');
+                document.getElementById('sort-desc').classList.remove('active');
+                document.getElementById('sort-roi-desc').classList.remove('active');
+                document.getElementById('sort-roi-asc').classList.remove('active');
                 render();
                 attachCardEvents();
             });
-            document.getElementById('sort-roi').addEventListener('click', function () {
-                sortOrder = sortOrder === 'roi' ? null : 'roi';
-                document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
-                if (sortOrder) this.classList.add('active');
-                renderGuns();
+            document.getElementById('sort-roi-desc').addEventListener('click', function () {
+                sortOrderRoi = sortOrderRoi === 'roi-desc' ? null : 'roi-desc';
+                if (sortOrderRoi === 'roi-desc') sortOrder = null;
+                this.classList.toggle('active', sortOrderRoi === 'roi-desc');
+                document.getElementById('sort-roi-asc').classList.remove('active');
+                document.getElementById('sort-desc').classList.remove('active');
+                document.getElementById('sort-asc').classList.remove('active');
+                render();
+                attachCardEvents();
+            });
+            document.getElementById('sort-roi-asc').addEventListener('click', function () {
+                sortOrderRoi = sortOrderRoi === 'roi-asc' ? null : 'roi-asc';
+                if (sortOrderRoi === 'roi-asc') sortOrder = null;
+                this.classList.toggle('active', sortOrderRoi === 'roi-asc');
+                document.getElementById('sort-roi-desc').classList.remove('active');
+                document.getElementById('sort-desc').classList.remove('active');
+                document.getElementById('sort-asc').classList.remove('active');
+                render();
+                attachCardEvents();
             });
 
             document.getElementById('search-input').addEventListener('input', function () {
                 searchQuery = this.value.trim().toLowerCase();
+                render();
+                attachCardEvents();
+            });
+
+            document.getElementById('roi-all').addEventListener('click', function () {
+                roiFilter = 'all';
+                document.querySelectorAll('#roi-filters .sort-btn').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                render();
+                attachCardEvents();
+            });
+            document.getElementById('roi-profit').addEventListener('click', function () {
+                roiFilter = 'profit';
+                document.querySelectorAll('#roi-filters .sort-btn').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                render();
+                attachCardEvents();
+            });
+            document.getElementById('roi-loss').addEventListener('click', function () {
+                roiFilter = 'loss';
+                document.querySelectorAll('#roi-filters .sort-btn').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
                 render();
                 attachCardEvents();
             });
@@ -1296,9 +1369,12 @@
                 searchQuery = '';
                 priceMin = 0;
                 sortOrder = null;
+                sortOrderRoi = null;
+                roiFilter = 'all';
                 document.getElementById('search-input').value = '';
                 document.getElementById('price-filter').value = '';
                 document.querySelectorAll('.btn-filter, .sort-btn').forEach(b => b.classList.remove('active', 'active-type'));
+                document.getElementById('roi-all').classList.add('active');
                 render();
                 attachCardEvents();
             });
