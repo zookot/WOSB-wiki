@@ -915,8 +915,8 @@ function updateCalcTotal() {
         if (!qty) return sum;
         const item = ALL_ITEMS.find(i => i.name === name);
         if (!item) return sum;
-        const cost = getUnitCost(item, discount) || item.cost || 0;
-        return sum + cost * qty;
+        const revenue = item.cost || 0;
+        return sum + revenue * qty;
     }, 0);
     document.getElementById('calc-total').textContent = fmt(total) + ' 🪙';
     const note = document.getElementById('calc-discount-note');
